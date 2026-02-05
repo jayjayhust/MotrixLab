@@ -25,7 +25,7 @@ from motrix_envs.np.env import NpEnv, NpEnvState
 from .cfg import AnymalCEnvCfg
 
 
-@registry.env("anymal_c_navigation_flat", "np")
+@registry.env("anymal_c_locomotion_flat", "np")
 class AnymalCEnv(NpEnv):
     _cfg: AnymalCEnvCfg
 
@@ -75,7 +75,7 @@ class AnymalCEnv(NpEnv):
     def _init_contact_geometry(self):
         """Initialize geometry indices required for contact detection"""
         cfg = self._cfg
-        self.ground_index = self._model.get_geom_index(cfg.asset.ground_name)
+        self.ground_index = self._model.get_geom_index(cfg.asset.ground_name)  # Ground geometry index
 
         # Initialize contact detection matrix
         self._init_termination_contact()
@@ -163,7 +163,7 @@ class AnymalCEnv(NpEnv):
 
         # Position control mode: directly input target angles
         actions_scaled = actions * self._cfg.control_config.action_scale
-        state.data.actuator_ctrls = self.default_angles + actions_scaled
+        state.data.actuator_ctrls = self.default_angles + actions_scaled  # Target joint angles
         return state
 
     def update_state(self, state: NpEnvState):
@@ -186,8 +186,8 @@ class AnymalCEnv(NpEnv):
         pose_commands = state.info["pose_commands"]
         robot_position = root_pos[:, :2]
         robot_heading = Quaternion.get_yaw(root_quat)
-        target_position = pose_commands[:, :2]
-        target_heading = pose_commands[:, 2]
+        target_position = pose_commands[:, :2]  # [x, y]
+        target_heading = pose_commands[:, 2]  # yaw?
 
         # Calculate desired velocity (based on position error)
         position_error = target_position - robot_position
@@ -256,7 +256,8 @@ class AnymalCEnv(NpEnv):
             ],
             axis=-1,
         )
-        assert obs.shape == (data.shape[0], 54)
+        print(f"obs.shape:{obs.shape}")
+        assert obs.shape == (data.shape[0], 54)  # 54 + 1 = 55维
 
         # Update target position marker
         self._update_target_marker(data, pose_commands)
@@ -271,9 +272,9 @@ class AnymalCEnv(NpEnv):
         terminated_state = self._compute_terminated(state)
         terminated = terminated_state.terminated
 
-        state.obs = obs
-        state.reward = reward
-        state.terminated = terminated
+        state.obs = obs  # Update observation
+        state.reward = reward  # Update reward
+        state.terminated = terminated  # Update termination
 
         return state
 
@@ -451,10 +452,10 @@ class AnymalCEnv(NpEnv):
         Update position and orientation of target marker
         """
         num_envs = data.shape[0]
-        arrow_pos = pose_commands.copy()
+        arrow_pos = pose_commands.copy()  # [num_envs, 3]
         arrow_pos[:, 2] = 0.05
         arrow_pos = np.column_stack([pose_commands[:, 0], pose_commands[:, 1], np.full((num_envs, 1), 0.5)])
-        arrow_quat = Quaternion.from_euler(0, 0, pose_commands[:, 2])
+        arrow_quat = Quaternion.from_euler(0, 0, pose_commands[:, 2])  # [num_envs, 4]
         mocap = self._model.get_body("target_marker").mocap
         mocap.set_pose(data, np.concatenate([arrow_pos, arrow_quat], axis=1))
 
@@ -520,6 +521,7 @@ class AnymalCEnv(NpEnv):
             low=cfg.commands.pose_command_range[2], high=cfg.commands.pose_command_range[5], size=(num_envs, 1)
         )
 
+        # Combine into pose commands
         pose_commands = np.concatenate([target_positions, target_headings], axis=1)
 
         # Set initial state - avoid adding noise to quaternion

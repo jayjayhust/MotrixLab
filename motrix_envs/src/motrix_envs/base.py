@@ -31,7 +31,8 @@ class EnvCfg:
     sim_dt: float = 0.01
     max_episode_seconds: float = None
     ctrl_dt: float = 0.01
-    render_spacing: float = 1.0
+    # render_spacing: float = 1.0
+    render_spacing: float = 0.0  # modified for section001
 
     @property
     def max_episode_steps(self) -> Optional[int]:

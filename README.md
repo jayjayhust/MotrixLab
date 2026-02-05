@@ -78,12 +78,15 @@ View environments without executing training:
 
 ```bash
 uv run scripts/view.py --env cartpole
+uv run scripts/view.py --env cartpole
 ```
 
 ### Model Training
 
 ```bash
 uv run scripts/train.py --env cartpole
+uv run scripts/train.py --env anymal_c_locomotion_flat
+uv run scripts/train.py --env vbot_navigation_section001
 ```
 
 Training results are saved in the `runs/{env-name}/` directory.
@@ -92,12 +95,16 @@ View training data through TensorBoard:
 
 ```bash
 uv run tensorboard --logdir runs/{env-name}
+uv run tensorboard --logdir runs/anymal_c_locomotion_flat
+uv run tensorboard --logdir runs/vbot_navigation_section001
 ```
 
 ### Model Inference
 
 ```bash
 uv run scripts/play.py --env cartpole
+uv run scripts/play.py --env anymal_c_locomotion_flat --num-envs 1
+uv run scripts/play.py --env vbot_navigation_section001 --num-envs 1
 ```
 
 For more usage methods, please refer to the [User Documentation](https://motrixlab.readthedocs.io)
