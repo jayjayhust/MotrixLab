@@ -91,6 +91,7 @@ uv run scripts/view.py --env vbot_navigation_section013
 uv run scripts/train.py --env cartpole
 uv run scripts/train.py --env anymal_c_locomotion_flat
 uv run scripts/train.py --env vbot_navigation_section001
+uv run scripts/train.py --env vbot_navigation_section011  --num-envs 4 --render
 ```
 
 Training results are saved in the `runs/{env-name}/` directory.

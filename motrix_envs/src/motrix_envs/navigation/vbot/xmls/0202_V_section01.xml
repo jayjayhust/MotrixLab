@@ -39,6 +39,13 @@
     <material name="MI_start-point_BK" rgba="1 1 1 1" reflectance="0.5" metallic="0.0" roughness="1.0">
       <layer texture="start-point_BK_Bake1_CyclesBake S2A_COMBINED" role="rgb"/>
     </material>
+    <material name="MI_ENDPOINT" rgba="1 1 1 1" reflectance="0.5" metallic="0.0" roughness="0.20000000298023224">
+      <layer texture="ENDPOINT_Bake1_CyclesBake_COMBINED" role="rgb"/>
+    </material>
+    <material name="MI_LANTERN_BODY_BK" rgba="1 1 1 1" emission="0.5 0.5 0.5 1.0" emissionintensity="0.2">
+      <layer texture="LANTERN_BODY_BK_Bake1_CyclesBake_COMBINED" role="rgb"/>
+      <layer texture="LANTERN_EMMI" role="emissive"/>
+    </material>
 
     <!-- Visual meshes -->
     <mesh class="visual" name="V_2026_LIGHT" file="V_2026_LIGHT.obj"/>
@@ -51,6 +58,8 @@
     <mesh class="visual" name="V_ground_left2_LIGHT" file="V_ground_left2_LIGHT.obj"/>
     <mesh class="visual" name="V_start-point_003_LIGHT" file="V_start-point_003_LIGHT.obj"/>
     <mesh class="visual" name="V_start-point_BK" file="V_start-point_BK.obj"/>
+    <mesh class="visual" name="V_ENDPOINT" file="V_ENDPOINT.obj"/>
+    <mesh class="visual" name="V_LANTERN_BODY_BK" file="V_LANTERN_BODY_BK.obj"/>
 
     <!-- Collision meshes -->
   </asset>
@@ -67,6 +76,8 @@
   <worldbody>
 
     <body name="B_body" pos="0.0 0.0 0.0" quat="1.0 0.0 0.0 0.0">
+      <geom name="End_Point" class="visual" mesh="V_ENDPOINT" pos="0.0 8.0 1.5" quat="1.0 0.0 0.0 0.0" material="MI_ENDPOINT"/>
+      <geom name="Way_Point_1" class="visual" mesh="V_LANTERN_BODY_BK" pos="-1 -2.5 2.5" quat="1.0 0.0 0.0 0.0" material="MI_LANTERN_BODY_BK"/>
       <geom class="visual" mesh="V_2026_LIGHT" pos="0.0 7.789973258972168 1.0088530778884888" quat="1.0 0.0 0.0 0.0" material="YELLOW_light.006"/>
       <geom class="visual" mesh="V_arrow_1_LIGHT" pos="2.384185791015625e-07 3.0717613697052 0.2923547327518463" quat="1.0 0.0 0.0 0.0" material="MI_white_light"/>
       <geom class="visual" mesh="V_ground_left2_LIGHT" pos="4.76837158203125e-07 1.9148139953613281 1.2470474243164062" quat="1.0 0.0 0.0 0.0" material="MI_white_light"/>
