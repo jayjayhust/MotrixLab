@@ -511,7 +511,7 @@ class VBotSection012EnvCfg(VBotStairsEnvCfg):
     @dataclass
     class InitState:
         # 起始位置：随机化范围内生成
-        pos = [0.0, -2.5, 0.5]  # 机器人初始出生的中心位置
+        pos = [0.0, 10, 2.0]  # 机器人初始出生的中心位置
         pos_range = 0.1  # 位置随机范围：±0.1m（0.2m×0.2m区域）
         pos_randomization_range = [-5.0, -5.0, 5.0, 5.0]  # X±5.0m, Y±5.0m随机
 
@@ -577,7 +577,7 @@ class VBotSection013EnvCfg(VBotStairsEnvCfg):
     @dataclass
     class InitState:
         # 起始位置：随机化范围内生成
-        pos = [0.0, -2.5, 0.5]  # 机器人初始出生的中心位置
+        pos = [0.0, 26.0, 2.0]  # 机器人初始出生的中心位置
         pos_range = 0.1  # 位置随机范围：±0.1m（0.2m×0.2m区域）
         pos_randomization_range = [-5.0, -5.0, 5.0, 5.0]  # X±5.0m, Y±5.0m随机
 
