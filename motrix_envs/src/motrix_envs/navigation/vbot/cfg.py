@@ -617,3 +617,69 @@ class VBotSection013EnvCfg(VBotStairsEnvCfg):
     control_config: ControlConfig = field(default_factory=ControlConfig)
     noise_config: NoiseConfig = field(default_factory=NoiseConfig)
     reward_config: RewardConfig = field(default_factory=RewardConfig)
+
+@registry.envcfg("vbot_navigation_section002")
+#通过 @registry.envcfg("vbot_navigation_section002") 注册
+@dataclass
+class VBotSection002EnvCfg(VBotStairsEnvCfg):
+    """VBot Section002全地形训练配置"""
+    model_file: str = os.path.dirname(__file__) + "/xmls/scene_section002.xml"
+    max_episode_seconds: float = 40.0  # 拉长一倍：从20秒增加到40秒
+    max_episode_steps: int = 4000  # 拉长一倍：从2000步增加到4000步（本回合步数到达后会重新开始训练）
+    sim_dt: float = 0.01    # 仿真步长 10ms = 100Hz
+    ctrl_dt: float = 0.01
+    reset_yaw_scale: float = 0.1
+    max_dof_vel: float = 100.0  # 最大关节速度阈值，训练初期给予更大容忍度
+    
+    @dataclass
+    class NoiseConfig:
+        level: float = 1
+        scale_joint_angle: float = 0.01
+        scale_joint_vel: float = 0.15
+        scale_gyro: float = 0.02
+        scale_gravity: float = 0.005
+        scale_linvel: float = 0.01
+
+    @dataclass
+    class InitState:
+        # 起始位置：随机化范围内生成
+        pos = [0.0, -2.5, 0.5]  # 机器人初始出生的中心位置
+        pos_range = 0.1  # 位置随机范围：±0.1m（0.2m×0.2m区域）
+        pos_randomization_range = [-5.0, -5.0, 5.0, 5.0]  # X±5.0m, Y±5.0m随机
+
+        default_joint_angles = {
+            "FR_hip_joint": -0.0,
+            "FR_thigh_joint": 0.9,
+            "FR_calf_joint": -1.8,
+            "FL_hip_joint": 0.0,
+            "FL_thigh_joint": 0.9,
+            "FL_calf_joint": -1.8,
+            "RR_hip_joint": -0.0,
+            "RR_thigh_joint": 0.9,
+            "RR_calf_joint": -1.8,
+            "RL_hip_joint": 0.0,
+            "RL_thigh_joint": 0.9,
+            "RL_calf_joint": -1.8,
+        }
+
+    @dataclass
+    class Commands:
+        # 目标位置相对于机器人初始位置的偏移范围 [dx_min, dy_min, yaw_min, dx_max, dy_max, yaw_max]
+        # dx/dy: 相对机器人初始位置的偏移（米）
+        # yaw: 目标绝对朝向（弧度），水平方向随机
+        
+        # 原始配置（已注释）：
+        # 目标位置：固定在终止角范围远端（完全无随机化）
+        # 固定目标点: X=0, Y=10.2, Z=2 (Z通过XML控制)
+        # 起始位置Y=-2.4, 目标Y=10.2, 距离=12.6米
+        pose_command_range = [0.0, 10.2, 0.0, 0.0, 10.2, 0.0]
+
+    @dataclass
+    class ControlConfig:
+        action_scale = 0.25
+
+    init_state: InitState = field(default_factory=InitState)
+    commands: Commands = field(default_factory=Commands)
+    control_config: ControlConfig = field(default_factory=ControlConfig)
+    noise_config: NoiseConfig = field(default_factory=NoiseConfig)
+    reward_config: RewardConfig = field(default_factory=RewardConfig)

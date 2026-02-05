@@ -78,7 +78,11 @@ View environments without executing training:
 
 ```bash
 uv run scripts/view.py --env cartpole
-uv run scripts/view.py --env cartpole
+uv run scripts/view.py --env anymal_c_locomotion_flat
+uv run scripts/view.py --env vbot_navigation_section001
+uv run scripts/view.py --env vbot_navigation_section011
+uv run scripts/view.py --env vbot_navigation_section012
+uv run scripts/view.py --env vbot_navigation_section013
 ```
 
 ### Model Training

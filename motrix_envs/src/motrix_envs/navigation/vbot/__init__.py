@@ -19,6 +19,7 @@ from .vbot_section001_np import VBotSection001Env
 from .vbot_section011_np import VBotSection011Env
 from .vbot_section012_np import VBotSection012Env
 from .vbot_section013_np import VBotSection013Env
+from .vbot_section002_np import VBotSection002Env
 from .vbot_np import VbotEnv
 # from .vbot_np import VBotEnv  # noqa: F401
 # from .vbot_stairs_np import VBotStairsEnv  # noqa: F401
