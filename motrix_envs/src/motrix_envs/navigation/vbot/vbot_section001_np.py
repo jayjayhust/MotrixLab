@@ -552,22 +552,31 @@ class VBotSection001Env(NpEnv):
             
         # 基座接触地面终止（使用传感器）
         try:
-            base_contact_value = self._model.get_sensor_value("base_contact", data)
-            print(f"[base_contact] base_contact_value: {base_contact_value}")
+            base_contact_value = self._model.get_sensor_value("base_contact", data)  # 基座接触传感器值（全零代表未接触）
+            # 只打印前10条数据，如果条数小于10，打印全部
+            if hasattr(base_contact_value, '__len__'):
+                display_data = base_contact_value[:10] if len(base_contact_value) > 10 else base_contact_value
+                print(f"[base_contact] base_contact_value (first 10): {display_data}")
+            else:
+                print(f"[base_contact] base_contact_value: {base_contact_value}")
             if base_contact_value.ndim == 0:
                 base_contact = np.array([base_contact_value > 0.01], dtype=bool)
-                print("1")
             elif base_contact_value.shape[0] != self._num_envs:
                 base_contact = np.full(self._num_envs, base_contact_value.flatten()[0] > 0.01, dtype=bool)
-                print("2")
             else:
-                base_contact = (base_contact_value > 0.01).flatten()[:self._num_envs]  # 确保形状正确?
-                print("3")
+                # base_contact = (base_contact_value > 0.01).flatten()[:self._num_envs]  # 数值大于0.01代表base已接触地面，可以触发终止条件了?
+                # 对每个环境检查是否有任何接触点超过阈值
+                base_contact = np.any(base_contact_value > 0.01, axis=1)[:self._num_envs]
         except Exception as e:
             print(f"[Warning] 无法读取base_contact传感器: {e}")
             base_contact = np.zeros(self._num_envs, dtype=bool)  
         # terminated = base_contact.copy()
-        print(f"[base_contact] base_contact={base_contact}")
+        # 只打印前10条数据，如果条数小于10，打印全部
+        if hasattr(base_contact, '__len__'):
+            display_data = base_contact[:10] if len(base_contact) > 10 else base_contact
+            print(f"[base_contact] base_contact (first 10): {display_data}")
+        else:
+            print(f"[base_contact] base_contact: {base_contact}")
         terminated = np.logical_or(terminated, base_contact)
 
         # 调试：统计终止原因
@@ -635,7 +644,15 @@ class VBotSection001Env(NpEnv):
         
         position_threshold = 0.3  # 与目标位置的误差阈值
         reached_position = distance_to_target < position_threshold
-        print(f"[reached_position] reached_position={reached_position} distance_to_target={distance_to_target}")
+        # 只打印前10条数据，如果条数小于10，打印全部
+        if hasattr(reached_position, '__len__') and hasattr(distance_to_target, '__len__'):
+            display_reached = reached_position[:10] if len(reached_position) > 10 else reached_position
+            display_distance = distance_to_target[:10] if len(distance_to_target) > 10 else distance_to_target
+            print(f"[reached_position] reached_position (first 10)={display_reached}")
+            print(f"[reached_position] distance_to_target (first 10)={display_distance}")
+        else:
+            print(f"[reached_position] reached_position={reached_position}")
+            print(f"[reached_position] distance_to_target={distance_to_target}")
         
         heading_threshold = np.deg2rad(15)
         reached_heading = np.abs(heading_diff) < heading_threshold
