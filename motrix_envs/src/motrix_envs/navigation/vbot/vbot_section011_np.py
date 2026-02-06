@@ -579,13 +579,22 @@ class VBotSection011Env(NpEnv):
             print(f"[base_contact] base_contact: {base_contact}")
         terminated = np.logical_or(terminated, base_contact)
 
+        # 陀螺仪三轴加速度传感器数据异常终止
+        gyro = self._model.get_sensor_value(self._cfg.sensor.base_gyro, data)
+        abs_gyro_z = np.abs(gyro[:, 2])
+        large_values = abs_gyro_z[abs_gyro_z > 10]  # 找出绝对值大于10的值
+        if len(large_values) > 0:
+            print(f"[Warning] abs_gyro_z contains large values: {large_values}")
+            terminated = np.logical_or(terminated, abs_gyro_z > 10)
+
         # 调试：统计终止原因
         if terminated.any():
             timeout_count = int(timeout.sum())
             contact_count = int(base_contact.sum())
+            gyro_count = int(large_values.sum())
             total = int(terminated.sum())
             if total > 0 and state.info["steps"][0] % 100 == 0:  # 每100步打印一次
-                # print(f"[termination] total={total} timeout={timeout_count} contact={contact_count}")
+                print(f"[termination] total={total} timeout={timeout_count} contact={contact_count} gyro={gyro_count}")
                 pass
         
         return state.replace(terminated=terminated)
@@ -652,15 +661,15 @@ class VBotSection011Env(NpEnv):
             display_distance = distance_to_target[:10] if len(distance_to_target) > 10 else distance_to_target
             display_target = target_position[:10] if len(target_position) > 10 else target_position
             display_robot = robot_position[:10] if len(robot_position) > 10 else robot_position
-            print(f"[reached_position] reached_position (first 10)={display_reached}")
+            # print(f"[reached_position] reached_position (first 10)={display_reached}")
             print(f"[reached_position] distance_to_target (first 10)={display_distance}")
             # print(f"[reached_position] target_position (first 10)={display_target}")
-            print(f"[reached_position] robot_position (first 10)={display_robot}")
+            # print(f"[reached_position] robot_position (first 10)={display_robot}")
         else:
-            print(f"[reached_position] reached_position={reached_position}")
+            # print(f"[reached_position] reached_position={reached_position}")
             print(f"[reached_position] distance_to_target={distance_to_target}")
             # print(f"[reached_position] target_position={target_position}")
-            print(f"[reached_position] robot_position={robot_position}")
+            # print(f"[reached_position] robot_position={robot_position}")
         
         heading_threshold = np.deg2rad(15)
         reached_heading = np.abs(heading_diff) < heading_threshold
@@ -686,27 +695,36 @@ class VBotSection011Env(NpEnv):
         orientation_penalty = np.square(projected_gravity[:, 0]) + np.square(projected_gravity[:, 1]) + np.square(projected_gravity[:, 2] + 1.0)
 
         # 到达与停止判定（奖励加成）
-        speed_xy = np.linalg.norm(base_lin_vel[:, :2], axis=1)
-        zero_ang_mask = np.abs(gyro[:, 2]) < 0.05  # 放宽到0.05 rad/s ≈ 2.86°/s
-        zero_ang_bonus = np.where(np.logical_and(reached_all, zero_ang_mask), 6.0, 0.0)
+        speed_xy = np.linalg.norm(np.clip(base_lin_vel[:, :2], -100, 100), axis=1)  # 计算X/Y轴线速度
+        gyro_z_clipped = np.clip(gyro[:, 2], -20, 20)  # 限制Z轴角速度在[-20, 20]范围内
+        zero_ang_mask = np.abs(gyro_z_clipped) < 0.05  # 获取陀螺仪Z轴的角速度（所有行的第2列:z-axis），放宽到0.05 rad/s ≈ 2.86°/s
+        zero_ang_bonus = np.where(np.logical_and(reached_all, zero_ang_mask), 6.0, 0.0)  # 到达后：零角速度 bonus
         # 防止指数溢出：限制指数参数的最大值
-        exp_arg1 = np.clip((speed_xy / 0.2)**2, 0, 100)  # 限制最大值为100
-        exp_arg2 = np.clip((np.abs(gyro[:, 2]) / 0.1)**4, 0, 100)  # 限制最大值为100
-        stop_base = 2 * (0.8 * np.exp(-exp_arg1) + 1.2 * np.exp(-exp_arg2))
-        stop_bonus = np.where(reached_all, stop_base + zero_ang_bonus, 0.0)
+        speed_xy_calc = np.clip((speed_xy / 0.2)**2, 0, 100)  # 限制最小值为0，最大值为100
+        print("speed_xy 统计信息:")
+        print(f"  最小值: {np.min(speed_xy)}")
+        print(f"  最大值: {np.max(speed_xy)}")
+        # print(f"  绝对值最大值: {np.max(np.abs(speed_xy))}")
+        gyro_z_calc = np.clip((np.abs(gyro_z_clipped) / 0.1)**4, 0, 100)  # 限制最小值为0，最大值为100
+        print("gyro[:, 2] 统计信息:")
+        print(f"  最小值: {np.min(gyro[:, 2])}")
+        print(f"  最大值: {np.max(gyro[:, 2])}")
+        # print(f"  绝对值最大值: {np.max(np.abs(gyro[:, 2]))}")
+        stop_base = 2 * (0.8 * np.exp(-speed_xy_calc) + 1.2 * np.exp(-gyro_z_calc))  # 到达后：停止奖励基础
+        stop_bonus = np.where(reached_all, stop_base + zero_ang_bonus, 0.0)  # 到达后：停止奖励（包含停止奖励基础+零角速度 bonus）
         
         # Z轴线速度惩罚（应用归一化避免溢出）
-        lin_vel_z_penalty = np.square(base_lin_vel[:, 2] * self._cfg.normalization.lin_vel)
+        lin_vel_z_penalty = np.square(np.clip(base_lin_vel[:, 2], -100, 100) * self._cfg.normalization.lin_vel)
         
         # XY轴角速度惩罚（应用归一化避免溢出）
-        ang_vel_xy_penalty = np.sum(np.square(gyro[:, :2] * self._cfg.normalization.ang_vel), axis=1)
+        ang_vel_xy_penalty = np.sum(np.square(np.clip(gyro[:, :2], -20, 20) * self._cfg.normalization.ang_vel), axis=1)
         
         # 力矩惩罚
         torque_penalty = np.sum(np.square(data.actuator_ctrls), axis=1)
         
         # 关节速度惩罚（应用归一化避免溢出）
         joint_vel = self.get_dof_vel(data)
-        dof_vel_penalty = np.sum(np.square(joint_vel * self._cfg.normalization.dof_vel), axis=1)
+        dof_vel_penalty = np.sum(np.square(np.clip(joint_vel, -self._cfg.max_dof_vel, self._cfg.max_dof_vel) * self._cfg.normalization.dof_vel), axis=1)
         
         # 动作变化惩罚
         action_diff = info["current_actions"] - info["last_actions"]
@@ -750,7 +768,7 @@ class VBotSection011Env(NpEnv):
             arrival_count = int((arrival_bonus > 0).sum())
             stop_count = int((stop_bonus > 0).sum())
             zero_ang_count = int((zero_ang_bonus > 0).sum())
-            gyro_z_mean = float(np.mean(abs(gyro[:, 2])))
+            gyro_z_mean = float(np.mean(abs(gyro_z_clipped)))
             total_envs = self._num_envs
             
             # 额外统计：环境状态分布
@@ -766,9 +784,9 @@ class VBotSection011Env(NpEnv):
                 print(f"[Warning] heading_diff contains NaN values, replacing with zero")
                 heading_diff = np.where(np.isnan(heading_diff), 0.0, heading_diff)  # 用0替换NaN
             
-            if np.any(np.isnan(gyro[:, 2])):
+            if np.any(np.isnan(gyro_z_clipped)):
                 print(f"[Warning] gyro[:, 2] contains NaN values, replacing with zero")
-                gyro = np.where(np.isnan(gyro), 0.0, gyro)  # 用0替换NaN
+                gyro_z_clipped = np.where(np.isnan(gyro_z_clipped), 0.0, gyro_z_clipped)  # 用0替换NaN
             
             if np.any(np.isnan(reward)):
                 print(f"[Warning] reward contains NaN values, replacing with zero")

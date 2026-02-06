@@ -798,8 +798,7 @@ class VBotSection001Env(NpEnv):
             high=cfg.init_state.pos_max_radius,
             size=(num_envs, 1)
         )
-        # angle = np.random.uniform(0, 2 * np.pi, size=(num_envs, 1))  # 角度范围在0到2π之间
-        angle = np.random.uniform(0, 2 * np.pi, size=(num_envs, 1))  # 角度范围在0到0.5π之间
+        angle = np.random.uniform(0, 2 * np.pi, size=(num_envs, 1))  # 角度范围在0到2π之间
         random_xy = radius * np.concatenate([np.cos(angle), np.sin(angle)], axis=1)
         robot_init_xy = self.spawn_center[:2] + random_xy  # [num_envs, 2]
         # 使用配置的高度

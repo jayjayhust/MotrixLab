@@ -22,7 +22,6 @@
     <!-- 加载需要的模型 -->
     <model name="section01V" file="0202_V_section01.xml"/>
     <model name="section01C" file="0126_C_section01.xml"/>
-    <!-- <model name="section01C" file="0126_C_section01_clean.xml"/> -->
   </asset>
 
   <worldbody>
