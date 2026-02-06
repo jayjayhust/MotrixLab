@@ -379,8 +379,15 @@ class VBotSection001EnvCfg(VBotStairsEnvCfg):
     @dataclass
     class InitState:
         # 起始位置：随机化范围内生成
-        pos = [0.0, -2.5, 0.5]  # 机器人初始出生的中心位置
+        pos = [0.0, 0.0, 0.5]  # 机器人初始出生的中心位置
+        # pos = [0.0, -11.0, 0.5]  # 机器人初始出生的中心位置（外圈电子围栏和电子灯带之间）
         pos_range = 0.1  # 位置随机范围：±0.1m（0.2m×0.2m区域）
+        # for play
+        pos_min_radius = 10.8
+        pos_max_radius = 11.0
+        # for training
+        # pos_min_radius = 8.0
+        # pos_max_radius = 9.0
         pos_randomization_range = [-5.0, -5.0, 5.0, 5.0]  # X±5.0m, Y±5.0m随机
 
         default_joint_angles = {
@@ -454,8 +461,8 @@ class VBotSection011EnvCfg(VBotStairsEnvCfg):
     @dataclass
     class InitState:
         # 起始位置：随机化范围内生成
-        # pos = [0.0, -2.5, 0.5]  # 机器人初始出生的中心位置(start point)
-        pos = [0.0, -1.0, 0.5]  # 机器人初始出生的中心位置(波浪型地图中)
+        pos = [0.0, -3.0, 0.5]  # 机器人初始出生的中心位置(start point)
+        # pos = [0.0, -1.0, 0.5]  # 机器人初始出生的中心位置(波浪型地图中)
         # pos = [0.0, 1.8, 0.5]  # 机器人初始出生的中心位置(跳过了波浪型地图，斜坡下平地)
         pos_range = 0.1  # 位置随机范围：±0.1m（0.2m×0.2m区域）
         pos_randomization_range = [-5.0, -5.0, 5.0, 5.0]  # X±5.0m, Y±5.0m随机

@@ -783,15 +783,27 @@ class VBotSection001Env(NpEnv):
         cfg: VBotSection001EnvCfg = self._cfg
         num_envs = data.shape[0]
         
-        # 在高台中央小范围内随机生成位置
+        # 初始位置生成方式1：以某点为中心点随机生成位置
         # X, Y: 在spawn_center周围 ±spawn_range 范围内随机
-        random_xy = np.random.uniform(
-            low=-self.spawn_range,
-            high=self.spawn_range,
-            size=(num_envs, 2)
+        # random_xy = np.random.uniform(
+        #     low=-self.spawn_range,
+        #     high=self.spawn_range,
+        #     size=(num_envs, 2)
+        # )
+        # robot_init_xy = self.spawn_center[:2] + random_xy  # [num_envs, 2]
+        # 初始位置生成方式2：以高台中央为中心点，制定半径环形区域内随机生成位置
+        # X, Y: random_xy距离原点的距离在pos_min_radius和pos_max_radius之间
+        radius = np.random.uniform(
+            low=cfg.init_state.pos_min_radius,
+            high=cfg.init_state.pos_max_radius,
+            size=(num_envs, 1)
         )
+        # angle = np.random.uniform(0, 2 * np.pi, size=(num_envs, 1))  # 角度范围在0到2π之间
+        angle = np.random.uniform(0, 2 * np.pi, size=(num_envs, 1))  # 角度范围在0到0.5π之间
+        random_xy = radius * np.concatenate([np.cos(angle), np.sin(angle)], axis=1)
         robot_init_xy = self.spawn_center[:2] + random_xy  # [num_envs, 2]
-        terrain_heights = np.full(num_envs, self.spawn_center[2], dtype=np.float32)  # 使用配置的高度
+        # 使用配置的高度
+        terrain_heights = np.full(num_envs, self.spawn_center[2], dtype=np.float32)
         
         # 组合XYZ坐标
         robot_init_pos = robot_init_xy  # [num_envs, 2]

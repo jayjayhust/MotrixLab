@@ -110,6 +110,7 @@ uv run tensorboard --logdir runs/vbot_navigation_section001
 uv run scripts/play.py --env cartpole
 uv run scripts/play.py --env anymal_c_locomotion_flat --num-envs 1
 uv run scripts/play.py --env vbot_navigation_section001 --num-envs 1
+uv run scripts/play.py --env vbot_navigation_section001 --num-envs 1 --policy runs/vbot_navigation_section001/26-02-06_08-40-45-310915_PPO/checkpoints/best_agent.pickle
 ```
 
 For more usage methods, please refer to the [User Documentation](https://motrixlab.readthedocs.io)
