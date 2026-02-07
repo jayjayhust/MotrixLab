@@ -60,6 +60,13 @@
       <layer texture="stepblock_BK_Bake1_CyclesBake_COMBINED" role="rgb"/>
     </material>
     <material name="MI_RED" rgba="0.5906158089637756 0.008023164235055447 0.001517647528089583 1.0" reflectance="0.5" metallic="0.0" roughness="1.0"/>
+    <material name="MI_ENDPOINT" rgba="1 1 1 1" reflectance="0.5" metallic="0.0" roughness="0.20000000298023224">
+      <layer texture="ENDPOINT_Bake1_CyclesBake_COMBINED" role="rgb"/>
+    </material>
+    <material name="MI_LANTERN_BODY_BK" rgba="1 1 1 1" emission="0.5 0.5 0.5 1.0" emissionintensity="0.2">
+      <layer texture="LANTERN_BODY_BK_Bake1_CyclesBake_COMBINED" role="rgb"/>
+      <layer texture="LANTERN_EMMI" role="emissive"/>
+    </material>
 
     <!-- Visual meshes -->
     <mesh class="visual" name="V_Cone_BK" file="V_Cone_BK.obj"/>
@@ -81,6 +88,8 @@
     <mesh class="visual" name="V_s2_end_BK" file="V_s2_end_BK.obj"/>
     <mesh class="visual" name="V_stepblock_BK" file="V_stepblock_BK.obj"/>
     <mesh class="visual" name="V_stepblock_outline" file="V_stepblock_outline.obj"/>
+    <mesh class="visual" name="V_ENDPOINT" file="V_ENDPOINT.obj"/>
+    <mesh class="visual" name="V_LANTERN_BODY_BK" file="V_LANTERN_BODY_BK.obj"/>
 
     <!-- Collision meshes -->
   </asset>
@@ -97,6 +106,8 @@
   <worldbody>
 
     <body name="B_body" pos="0.0 0.0 0.0" quat="1.0 0.0 0.0 0.0">
+      <geom name="End_Point_2" class="visual" mesh="V_LANTERN_BODY_BK" pos="0.0 24.0 2.5" quat="1.0 0.0 0.0 0.0" material="MI_LANTERN_BODY_BK"/>
+      <!-- <geom name="Way_Point_1" class="visual" mesh="V_LANTERN_BODY_BK" pos="-1 -2.5 2.5" quat="1.0 0.0 0.0 0.0" material="MI_LANTERN_BODY_BK"/> -->
       <geom class="visual" mesh="V_arrow_3_LIGHT" pos="-2.999999523162842 17.731996536254883 2.7990949153900146" quat="1.0 0.0 0.0 0.0" material="MI_white_light"/>
       <geom class="visual" mesh="V_bridge_barrier_BK" pos="-4.319393157958984 17.829622268676758 2.810610055923462" quat="1.0 0.0 0.0 0.0" material="MI_bridge_barrier_BK"/>
       <geom class="visual" mesh="V_bridge_Cylinder_BK" pos="-2.999999523162842 17.8212947845459 2.041141986846924" quat="1.0 0.0 0.0 0.0" material="MI_bridge_Cylinder_BK"/>

@@ -357,4 +357,60 @@ class navigation:
 
         # Medium-sized network (default configuration, suitable for most tasks)
         policy_hidden_layer_sizes: tuple[int, ...] = (256, 128, 64)
-        value_hidden_layer_sizes: tuple[int, ...] = (256, 128, 64)    
+        value_hidden_layer_sizes: tuple[int, ...] = (256, 128, 64)
+
+    @rlcfg("vbot_navigation_section012")
+    @dataclass
+    class VbotNavSec012PPOConfig(PPOCfg):
+        # ===== Basic Training Parameters =====
+        seed: int = 42  # Random seed
+        num_envs: int = 2048  # Number of parallel environments during training
+        play_num_envs: int = 16  # Number of parallel environments during evaluation
+        max_env_steps: int = 100_000_000  # Maximum training steps
+        check_point_interval: int = 1000  # Checkpoint save interval (save every 100 iterations)
+
+        # ===== PPO Algorithm Core Parameters =====
+        learning_rate: float = 3e-4  # Learning rate
+        rollouts: int = 48  # Number of experience replay rollouts
+        learning_epochs: int = 6  # Number of training epochs per update
+        mini_batches: int = 32  # Number of mini-batches
+        discount_factor: float = 0.99  # Discount factor
+        lambda_param: float = 0.95  # GAE parameter
+        grad_norm_clip: float = 1.0  # Gradient clipping
+
+        # ===== PPO Clipping Parameters =====
+        ratio_clip: float = 0.2  # PPO clipping ratio
+        value_clip: float = 0.2  # Value clipping
+        clip_predicted_values: bool = True  # Clip predicted values
+
+        # Medium-sized network (default configuration, suitable for most tasks)
+        policy_hidden_layer_sizes: tuple[int, ...] = (256, 128, 64)
+        value_hidden_layer_sizes: tuple[int, ...] = (256, 128, 64)
+
+    @rlcfg("vbot_navigation_section013")
+    @dataclass
+    class VbotNavSec013PPOConfig(PPOCfg):
+        # ===== Basic Training Parameters =====
+        seed: int = 42  # Random seed
+        num_envs: int = 2048  # Number of parallel environments during training
+        play_num_envs: int = 16  # Number of parallel environments during evaluation
+        max_env_steps: int = 100_000_000  # Maximum training steps
+        check_point_interval: int = 1000  # Checkpoint save interval (save every 100 iterations)
+
+        # ===== PPO Algorithm Core Parameters =====
+        learning_rate: float = 3e-4  # Learning rate
+        rollouts: int = 48  # Number of experience replay rollouts
+        learning_epochs: int = 6  # Number of training epochs per update
+        mini_batches: int = 32  # Number of mini-batches
+        discount_factor: float = 0.99  # Discount factor
+        lambda_param: float = 0.95  # GAE parameter
+        grad_norm_clip: float = 1.0  # Gradient clipping
+
+        # ===== PPO Clipping Parameters =====
+        ratio_clip: float = 0.2  # PPO clipping ratio
+        value_clip: float = 0.2  # Value clipping
+        clip_predicted_values: bool = True  # Clip predicted values
+
+        # Medium-sized network (default configuration, suitable for most tasks)
+        policy_hidden_layer_sizes: tuple[int, ...] = (256, 128, 64)
+        value_hidden_layer_sizes: tuple[int, ...] = (256, 128, 64)  

@@ -447,7 +447,7 @@ class VBotSection011EnvCfg(VBotStairsEnvCfg):
         terminate_after_contacts_on = ["collision_middle_box", "collision_head_box"]
         ground_subtree = "C_"  # 地形根节点，用于subtree接触检测
         ground_name = "ground"
-        goal_name = "V_End_Point"  # 目标位置名称，注意要加V_这个前缀（在scene_section011.xml中进行了定义）
+        goal_name = "V_End_Point_1"  # 目标位置名称，注意要加V_这个前缀（在scene_section011.xml中进行了定义）
 
     @dataclass
     class NoiseConfig:
@@ -509,7 +509,8 @@ class VBotSection011EnvCfg(VBotStairsEnvCfg):
 @dataclass
 class VBotSection012EnvCfg(VBotStairsEnvCfg):
     """VBot Section012单独训练配置 - 02地形"""
-    model_file: str = os.path.dirname(__file__) + "/xmls/scene_section012.xml"
+    # model_file: str = os.path.dirname(__file__) + "/xmls/scene_section012.xml"
+    model_file: str = os.path.dirname(__file__) + "/xmls/scene_section012-1.xml"
     max_episode_seconds: float = 40.0  # 拉长一倍：从20秒增加到40秒
     max_episode_steps: int = 4000  # 拉长一倍：从2000步增加到4000步（本回合步数到达后会重新开始训练）
     sim_dt: float = 0.01    # 仿真步长 10ms = 100Hz
@@ -517,6 +518,17 @@ class VBotSection012EnvCfg(VBotStairsEnvCfg):
     reset_yaw_scale: float = 0.1
     max_dof_vel: float = 100.0  # 最大关节速度阈值，训练初期给予更大容忍度
     
+    @dataclass
+    class Asset:
+        body_name = "base"
+        foot_names = ["FR", "FL", "RR", "RL"]
+        terminate_after_contacts_on = ["collision_middle_box", "collision_head_box"]
+        # ground_subtree = "C_"  # 地形根节点，用于subtree接触检测
+        ground_subtree = "S2C_"  # 地形根节点，用于subtree接触检测
+        ground_name = "ground"
+        # goal_name = "V_End_Point_2"  # 目标位置名称，注意要加V_这个前缀（在scene_section012.xml中进行了定义）
+        goal_name = "S2V_End_Point_2"  # 目标位置名称，注意要加V_这个前缀（在scene_section012-1.xml中进行了定义）
+
     @dataclass
     class NoiseConfig:
         level: float = 1
@@ -529,7 +541,8 @@ class VBotSection012EnvCfg(VBotStairsEnvCfg):
     @dataclass
     class InitState:
         # 起始位置：随机化范围内生成
-        pos = [0.0, 10, 2.0]  # 机器人初始出生的中心位置
+        pos = [0.0, 7.5, 2.0]  # 机器人初始出生的中心位置（平地过渡区）
+        # pos = [0.0, 10, 2.0]  # 机器人初始出生的中心位置（波浪型区域）
         pos_range = 0.1  # 位置随机范围：±0.1m（0.2m×0.2m区域）
         pos_randomization_range = [-5.0, -5.0, 5.0, 5.0]  # X±5.0m, Y±5.0m随机
 
@@ -569,6 +582,7 @@ class VBotSection012EnvCfg(VBotStairsEnvCfg):
     control_config: ControlConfig = field(default_factory=ControlConfig)
     noise_config: NoiseConfig = field(default_factory=NoiseConfig)
     reward_config: RewardConfig = field(default_factory=RewardConfig)
+    asset: Asset = field(default_factory=Asset)
 
 @registry.envcfg("vbot_navigation_section013")
 #通过 @registry.envcfg("vbot_navigation_section013") 注册
@@ -584,6 +598,15 @@ class VBotSection013EnvCfg(VBotStairsEnvCfg):
     max_dof_vel: float = 100.0  # 最大关节速度阈值，训练初期给予更大容忍度
     
     @dataclass
+    class Asset:
+        body_name = "base"
+        foot_names = ["FR", "FL", "RR", "RL"]
+        terminate_after_contacts_on = ["collision_middle_box", "collision_head_box"]
+        ground_subtree = "C_"  # 地形根节点，用于subtree接触检测
+        ground_name = "ground"
+        goal_name = "V_End_Point_3"  # 目标位置名称，注意要加V_这个前缀（在scene_section011.xml中进行了定义）
+    
+    @dataclass
     class NoiseConfig:
         level: float = 1
         scale_joint_angle: float = 0.01
@@ -596,6 +619,7 @@ class VBotSection013EnvCfg(VBotStairsEnvCfg):
     class InitState:
         # 起始位置：随机化范围内生成
         pos = [0.0, 26.0, 2.0]  # 机器人初始出生的中心位置
+        # pos = [0.0, 29.0, 2.0]  # 机器人初始出生的中心位置（跳过滚球，进入坑洼地形）
         pos_range = 0.1  # 位置随机范围：±0.1m（0.2m×0.2m区域）
         pos_randomization_range = [-5.0, -5.0, 5.0, 5.0]  # X±5.0m, Y±5.0m随机
 
@@ -635,6 +659,7 @@ class VBotSection013EnvCfg(VBotStairsEnvCfg):
     control_config: ControlConfig = field(default_factory=ControlConfig)
     noise_config: NoiseConfig = field(default_factory=NoiseConfig)
     reward_config: RewardConfig = field(default_factory=RewardConfig)
+    asset: Asset = field(default_factory=Asset)
 
 @registry.envcfg("vbot_navigation_section002")
 #通过 @registry.envcfg("vbot_navigation_section002") 注册
@@ -701,3 +726,4 @@ class VBotSection002EnvCfg(VBotStairsEnvCfg):
     control_config: ControlConfig = field(default_factory=ControlConfig)
     noise_config: NoiseConfig = field(default_factory=NoiseConfig)
     reward_config: RewardConfig = field(default_factory=RewardConfig)
+    asset: Asset = field(default_factory=Asset)

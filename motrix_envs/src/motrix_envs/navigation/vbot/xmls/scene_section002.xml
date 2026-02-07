@@ -20,7 +20,7 @@
     <texture type="skybox" builtin="gradient" rgb1="0.3 0.5 0.7" rgb2="0 0 0" width="512" height="3072"/>
     
     <!-- 加载section01地形模型  -->
-    <model name="section01C" file="0131_C_section01.xml"/>
+    <model name="section01C" file="0126_C_section01.xml"/>
     <model name="section01V" file="0202_V_section01.xml"/>
     
     <!-- 加载section02地形模型 - 使用0126版本 -->
@@ -53,12 +53,12 @@
   <sensor>
     <!-- 传感器配置 -->
     <!-- 修改接触传感器配置以匹配新的前缀 -->
-    <contact name="FR_foot_contact_s1" subtree1="FR_foot" subtree2="S1C_B_BODY" data="normal" num="1" />
-    <contact name="FL_foot_contact_s1" subtree1="FL_foot" subtree2="S1C_B_BODY" data="normal" num="1" />
-    <contact name="RR_foot_contact_s1" subtree1="RR_foot" subtree2="S1C_B_BODY" data="normal" num="1" />
-    <contact name="RL_foot_contact_s1" subtree1="RL_foot" subtree2="S1C_B_BODY" data="normal" num="1" />
-    <!-- <contact name="base_contact_s1" subtree1="base" subtree2="S1C_B_BODY" data="normal" num="1" /> -->
-    <contact name="base_contact" subtree1="base" subtree2="S1C_B_BODY" data="normal" num="1" />
+    <contact name="FR_foot_contact_s1" subtree1="FR_foot" subtree2="S1C_ground_root" data="normal" num="1" />
+    <contact name="FL_foot_contact_s1" subtree1="FL_foot" subtree2="S1C_ground_root" data="normal" num="1" />
+    <contact name="RR_foot_contact_s1" subtree1="RR_foot" subtree2="S1C_ground_root" data="normal" num="1" />
+    <contact name="RL_foot_contact_s1" subtree1="RL_foot" subtree2="S1C_ground_root" data="normal" num="1" />
+    <!-- <contact name="base_contact_s1" subtree1="base" subtree2="S1C_ground_root" data="normal" num="1" /> -->
+    <contact name="base_contact" subtree1="base" subtree2="S1C_ground_root" data="normal" num="1" />
 
     <contact name="FR_foot_contact_s2" subtree1="FR_foot" subtree2="S2C_ground_root" data="normal" num="1" />
     <contact name="FL_foot_contact_s2" subtree1="FL_foot" subtree2="S2C_ground_root" data="normal" num="1" />
