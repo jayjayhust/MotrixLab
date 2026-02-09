@@ -432,7 +432,8 @@ class VBotSection001EnvCfg(VBotStairsEnvCfg):
 @dataclass
 class VBotSection011EnvCfg(VBotStairsEnvCfg):
     """VBot Section011单独训练配置 - 01地形"""
-    model_file: str = os.path.dirname(__file__) + "/xmls/scene_section011.xml"
+    # model_file: str = os.path.dirname(__file__) + "/xmls/scene_section011.xml"
+    model_file: str = os.path.dirname(__file__) + "/xmls/scene_section011-1.xml"
     max_episode_seconds: float = 40.0  # 拉长一倍：从20秒增加到40秒
     max_episode_steps: int = 4000  # 拉长一倍：从2000步增加到4000步（本回合步数到达后会重新开始训练）
     sim_dt: float = 0.01    # 仿真步长 10ms = 100Hz
@@ -445,9 +446,11 @@ class VBotSection011EnvCfg(VBotStairsEnvCfg):
         body_name = "base"
         foot_names = ["FR", "FL", "RR", "RL"]
         terminate_after_contacts_on = ["collision_middle_box", "collision_head_box"]
-        ground_subtree = "C_"  # 地形根节点，用于subtree接触检测
+        # ground_subtree = "C_"  # 地形根节点，用于subtree接触检测
+        ground_subtree = "S1C_"  # 地形根节点，用于subtree接触检测
         ground_name = "ground"
-        goal_name = "V_End_Point_1"  # 目标位置名称，注意要加V_这个前缀（在scene_section011.xml中进行了定义）
+        # goal_name = "V_End_Point_1"  # 目标位置名称，注意要加V_这个前缀（在scene_section011.xml中进行了定义）
+        goal_name = "S1V_End_Point_1"  # 目标位置名称，注意要加V_这个前缀（在scene_section011-1.xml中进行了定义）
 
     @dataclass
     class NoiseConfig:
@@ -468,18 +471,18 @@ class VBotSection011EnvCfg(VBotStairsEnvCfg):
         pos_randomization_range = [-5.0, -5.0, 5.0, 5.0]  # X±5.0m, Y±5.0m随机
 
         default_joint_angles = {
-            "FR_hip_joint": -0.0,
-            "FR_thigh_joint": 0.9,
-            "FR_calf_joint": -1.8,
-            "FL_hip_joint": 0.0,
-            "FL_thigh_joint": 0.9,
-            "FL_calf_joint": -1.8,
-            "RR_hip_joint": -0.0,
-            "RR_thigh_joint": 0.9,
-            "RR_calf_joint": -1.8,
-            "RL_hip_joint": 0.0,
-            "RL_thigh_joint": 0.9,
-            "RL_calf_joint": -1.8,
+            "FR_hip_joint": -0.0,     # 右前髋关节
+            "FR_thigh_joint": 0.95,   # 右前大腿（适中抬高）
+            "FR_calf_joint": -1.85,   # 右前小腿
+            "FL_hip_joint": 0.0,      # 左前髋关节
+            "FL_thigh_joint": 0.95,   # 左前大腿（适中抬高）
+            "FL_calf_joint": -1.85,   # 左前小腿
+            "RR_hip_joint": -0.0,     # 右后髋关节
+            "RR_thigh_joint": 0.85,   # 右后大腿（稍低提供推进力）
+            "RR_calf_joint": -1.75,   # 右后小腿
+            "RL_hip_joint": 0.0,      # 左后髋关节
+            "RL_thigh_joint": 0.85,   # 左后大腿（稍低提供推进力）
+            "RL_calf_joint": -1.75,   # 左后小腿
         }
 
     @dataclass
@@ -503,6 +506,7 @@ class VBotSection011EnvCfg(VBotStairsEnvCfg):
     control_config: ControlConfig = field(default_factory=ControlConfig)
     noise_config: NoiseConfig = field(default_factory=NoiseConfig)
     reward_config: RewardConfig = field(default_factory=RewardConfig)
+    asset: Asset = field(default_factory=Asset)
 
 @registry.envcfg("vbot_navigation_section012")
 #通过 @registry.envcfg("vbot_navigation_section012") 注册
@@ -590,7 +594,8 @@ class VBotSection012EnvCfg(VBotStairsEnvCfg):
 @dataclass
 class VBotSection013EnvCfg(VBotStairsEnvCfg):
     """VBot Section013单独训练配置 - 03地形"""
-    model_file: str = os.path.dirname(__file__) + "/xmls/scene_section013.xml"
+    # model_file: str = os.path.dirname(__file__) + "/xmls/scene_section013.xml"
+    model_file: str = os.path.dirname(__file__) + "/xmls/scene_section013-1.xml"
     max_episode_seconds: float = 40.0  # 拉长一倍：从20秒增加到40秒
     max_episode_steps: int = 4000  # 拉长一倍：从2000步增加到4000步（本回合步数到达后会重新开始训练）
     sim_dt: float = 0.01    # 仿真步长 10ms = 100Hz
@@ -603,9 +608,10 @@ class VBotSection013EnvCfg(VBotStairsEnvCfg):
         body_name = "base"
         foot_names = ["FR", "FL", "RR", "RL"]
         terminate_after_contacts_on = ["collision_middle_box", "collision_head_box"]
-        ground_subtree = "C_"  # 地形根节点，用于subtree接触检测
+        # ground_subtree = "C_"  # 地形根节点，用于subtree接触检测
+        ground_subtree = "S3C_"  # 地形根节点，用于subtree接触检测
         ground_name = "ground"
-        goal_name = "V_End_Point_3"  # 目标位置名称，注意要加V_这个前缀（在scene_section011.xml中进行了定义）
+        goal_name = "S3V_End_Point_3"  # 目标位置名称，注意要加V_这个前缀（在scene_section013-1.xml中进行了定义）
     
     @dataclass
     class NoiseConfig:
@@ -625,18 +631,18 @@ class VBotSection013EnvCfg(VBotStairsEnvCfg):
         pos_randomization_range = [-5.0, -5.0, 5.0, 5.0]  # X±5.0m, Y±5.0m随机
 
         default_joint_angles = {
-            "FR_hip_joint": -0.0,
-            "FR_thigh_joint": 0.9,
-            "FR_calf_joint": -1.8,
-            "FL_hip_joint": 0.0,
-            "FL_thigh_joint": 0.9,
-            "FL_calf_joint": -1.8,
-            "RR_hip_joint": -0.0,
-            "RR_thigh_joint": 0.9,
-            "RR_calf_joint": -1.8,
-            "RL_hip_joint": 0.0,
-            "RL_thigh_joint": 0.9,
-            "RL_calf_joint": -1.8,
+            "FR_hip_joint": -0.0,     # 右前髋关节
+            "FR_thigh_joint": 0.95,   # 右前大腿（适中抬高）
+            "FR_calf_joint": -1.85,   # 右前小腿
+            "FL_hip_joint": 0.0,      # 左前髋关节
+            "FL_thigh_joint": 0.95,   # 左前大腿（适中抬高）
+            "FL_calf_joint": -1.85,   # 左前小腿
+            "RR_hip_joint": -0.0,     # 右后髋关节
+            "RR_thigh_joint": 0.85,   # 右后大腿（稍低提供推进力）
+            "RR_calf_joint": -1.75,   # 右后小腿
+            "RL_hip_joint": 0.0,      # 左后髋关节
+            "RL_thigh_joint": 0.85,   # 左后大腿（稍低提供推进力）
+            "RL_calf_joint": -1.75,   # 左后小腿
         }
 
     @dataclass
@@ -668,13 +674,25 @@ class VBotSection013EnvCfg(VBotStairsEnvCfg):
 class VBotSection002EnvCfg(VBotStairsEnvCfg):
     """VBot Section002全地形训练配置"""
     model_file: str = os.path.dirname(__file__) + "/xmls/scene_section002.xml"
-    max_episode_seconds: float = 40.0  # 拉长一倍：从20秒增加到40秒
-    max_episode_steps: int = 4000  # 拉长一倍：从2000步增加到4000步（本回合步数到达后会重新开始训练）
+    max_episode_seconds: float = 60.0  # 拉长：从20秒增加到60秒
+    max_episode_steps: int = 6000  # 拉长：从2000步增加到6000步（本回合步数到达后会重新开始训练）
     sim_dt: float = 0.01    # 仿真步长 10ms = 100Hz
     ctrl_dt: float = 0.01
     reset_yaw_scale: float = 0.1
     max_dof_vel: float = 100.0  # 最大关节速度阈值，训练初期给予更大容忍度
     
+    @dataclass
+    class Asset:
+        body_name = "base"
+        foot_names = ["FR", "FL", "RR", "RL"]
+        terminate_after_contacts_on = ["collision_middle_box", "collision_head_box"]
+        # ground_subtree = "C_"  # 地形根节点，用于subtree接触检测
+        ground_subtree = "S1C_"  # 地形根节点，用于subtree接触检测
+        # 支持多个地面子树前缀的列表，用于全地形接触检测
+        ground_subtree_prefixes = ["S1C_", "S2C_", "S3C_"]  # 全地形地面子树前缀
+        ground_name = "ground"
+        goal_name = "S3V_End_Point_3"  # 目标位置名称，注意要加S3V_这个前缀（在scene_section002-1.xml中进行了定义）
+
     @dataclass
     class NoiseConfig:
         level: float = 1
@@ -687,23 +705,25 @@ class VBotSection002EnvCfg(VBotStairsEnvCfg):
     @dataclass
     class InitState:
         # 起始位置：随机化范围内生成
-        pos = [0.0, -2.5, 0.5]  # 机器人初始出生的中心位置
+        pos = [0.0, -3.0, 0.5]  # 机器人初始出生的中心位置(start point)
+        # pos = [0.0, -1.0, 0.5]  # 机器人初始出生的中心位置(波浪型地图中)
+        # pos = [0.0, 1.8, 0.5]  # 机器人初始出生的中心位置(跳过了波浪型地图，斜坡下平地)
         pos_range = 0.1  # 位置随机范围：±0.1m（0.2m×0.2m区域）
         pos_randomization_range = [-5.0, -5.0, 5.0, 5.0]  # X±5.0m, Y±5.0m随机
 
         default_joint_angles = {
-            "FR_hip_joint": -0.0,
-            "FR_thigh_joint": 0.9,
-            "FR_calf_joint": -1.8,
-            "FL_hip_joint": 0.0,
-            "FL_thigh_joint": 0.9,
-            "FL_calf_joint": -1.8,
-            "RR_hip_joint": -0.0,
-            "RR_thigh_joint": 0.9,
-            "RR_calf_joint": -1.8,
-            "RL_hip_joint": 0.0,
-            "RL_thigh_joint": 0.9,
-            "RL_calf_joint": -1.8,
+            "FR_hip_joint": -0.0,     # 右前髋关节
+            "FR_thigh_joint": 0.95,   # 右前大腿（适中抬高）
+            "FR_calf_joint": -1.85,   # 右前小腿
+            "FL_hip_joint": 0.0,      # 左前髋关节
+            "FL_thigh_joint": 0.95,   # 左前大腿（适中抬高）
+            "FL_calf_joint": -1.85,   # 左前小腿
+            "RR_hip_joint": -0.0,     # 右后髋关节
+            "RR_thigh_joint": 0.85,   # 右后大腿（稍低提供推进力）
+            "RR_calf_joint": -1.75,   # 右后小腿
+            "RL_hip_joint": 0.0,      # 左后髋关节
+            "RL_thigh_joint": 0.85,   # 左后大腿（稍低提供推进力）
+            "RL_calf_joint": -1.75,   # 左后小腿
         }
 
     @dataclass
@@ -720,7 +740,7 @@ class VBotSection002EnvCfg(VBotStairsEnvCfg):
 
     @dataclass
     class ControlConfig:
-        action_scale = 0.25
+        action_scale = 0.2  # 楼梯navigation使用0.2，足够转向但比平地(0.25)更谨慎
 
     init_state: InitState = field(default_factory=InitState)
     commands: Commands = field(default_factory=Commands)

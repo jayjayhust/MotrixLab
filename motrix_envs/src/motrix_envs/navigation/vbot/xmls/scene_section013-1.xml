@@ -54,25 +54,25 @@
     <!-- 传感器配置（楼梯地形优化版） -->
     
     <!-- 足端接触传感器 - 增强版（支持更详细的接触力分析） -->
-    <contact name="FR_foot_contact_force" subtree1="FR_foot" subtree2="S1C_ground_root" data="force" num="3" />
-    <contact name="FL_foot_contact_force" subtree1="FL_foot" subtree2="S1C_ground_root" data="force" num="3" />
-    <contact name="RR_foot_contact_force" subtree1="RR_foot" subtree2="S1C_ground_root" data="force" num="3" />
-    <contact name="RL_foot_contact_force" subtree1="RL_foot" subtree2="S1C_ground_root" data="force" num="3" />
+    <contact name="FR_foot_contact_force" subtree1="FR_foot" subtree2="S3C_ground_root" data="force" num="3" />
+    <contact name="FL_foot_contact_force" subtree1="FL_foot" subtree2="S3C_ground_root" data="force" num="3" />
+    <contact name="RR_foot_contact_force" subtree1="RR_foot" subtree2="S3C_ground_root" data="force" num="3" />
+    <contact name="RL_foot_contact_force" subtree1="RL_foot" subtree2="S3C_ground_root" data="force" num="3" />
     
     <!-- 足端法向力传感器 -->
-    <contact name="FR_foot_contact_normal" subtree1="FR_foot" subtree2="S1C_ground_root" data="normal" num="1" />
-    <contact name="FL_foot_contact_normal" subtree1="FL_foot" subtree2="S1C_ground_root" data="normal" num="1" />
-    <contact name="RR_foot_contact_normal" subtree1="RR_foot" subtree2="S1C_ground_root" data="normal" num="1" />
-    <contact name="RL_foot_contact_normal" subtree1="RL_foot" subtree2="S1C_ground_root" data="normal" num="1" />
+    <contact name="FR_foot_contact_normal" subtree1="FR_foot" subtree2="S3C_ground_root" data="normal" num="1" />
+    <contact name="FL_foot_contact_normal" subtree1="FL_foot" subtree2="S3C_ground_root" data="normal" num="1" />
+    <contact name="RR_foot_contact_normal" subtree1="RR_foot" subtree2="S3C_ground_root" data="normal" num="1" />
+    <contact name="RL_foot_contact_normal" subtree1="RL_foot" subtree2="S3C_ground_root" data="normal" num="1" />
     
     <!-- 基础接触传感器 -->
-    <contact name="FR_foot_contact_s2" subtree1="FR_foot" subtree2="S1C_ground_root" data="normal" num="1" />
-    <contact name="FL_foot_contact_s2" subtree1="FL_foot" subtree2="S1C_ground_root" data="normal" num="1" />
-    <contact name="RR_foot_contact_s2" subtree1="RR_foot" subtree2="S1C_ground_root" data="normal" num="1" />
-    <contact name="RL_foot_contact_s2" subtree1="RL_foot" subtree2="S1C_ground_root" data="normal" num="1" />
+    <contact name="FR_foot_contact_s2" subtree1="FR_foot" subtree2="S3C_ground_root" data="normal" num="1" />
+    <contact name="FL_foot_contact_s2" subtree1="FL_foot" subtree2="S3C_ground_root" data="normal" num="1" />
+    <contact name="RR_foot_contact_s2" subtree1="RR_foot" subtree2="S3C_ground_root" data="normal" num="1" />
+    <contact name="RL_foot_contact_s2" subtree1="RL_foot" subtree2="S3C_ground_root" data="normal" num="1" />
     
     <!-- 基座接触传感器 -->
-    <contact name="base_contact" subtree1="base" subtree2="S1C_ground_root" data="normal" num="1" />
+    <contact name="base_contact" subtree1="base" subtree2="S3C_ground_root" data="normal" num="1" />
     
     <!-- 楼梯边缘检测传感器（虚拟传感器，用于奖励计算） -->
     <!-- 通过计算足端位置与预定义边缘的距离来实现 -->

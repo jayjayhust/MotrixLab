@@ -123,7 +123,7 @@ class VBotSection013Env(NpEnv):
                     self.default_angles[i] = angle
         
         self._init_dof_pos[-self._num_action:] = self.default_angles
-        self.action_filter_alpha = 0.3  # 动作滤波参数
+        self.action_filter_alpha = 0.35  # 平衡滤波强度，既减少抖动又保持响应性
     
     def _find_target_marker_dof_indices(self):
         """查找target_marker在dof_pos中的索引位置"""
@@ -251,12 +251,45 @@ class VBotSection013Env(NpEnv):
         current_pos = self.get_dof_pos(data)  # [num_envs, 12]
         current_vel = self.get_dof_vel(data)  # [num_envs, 12]
         
-        # PD控制器：tau = kp * (target - current) - kv * vel
-        kp = 80.0   # 位置增益
-        kv = 6.0    # 速度增益
+        # 下坡地形自适应PD控制器
+        # 检测是否处于下坡状态
+        try:
+            gravity_projection = self._model.get_sensor_value("gravity_projection", data)
+            slope_angle = np.arctan2(
+                np.linalg.norm(gravity_projection[:, :2], axis=1),
+                np.abs(gravity_projection[:, 2])
+            )
+            # 下坡检测：负坡度且坡度较大
+            is_downhill = np.logical_and(slope_angle < -np.deg2rad(10), slope_angle > -np.deg2rad(45))
+        except:
+            is_downhill = np.zeros(data.shape[0], dtype=bool)
+        
+        # 根据地形调整控制器参数
+        # 平地/上坡：较强参数以支持翻越
+        kp_fl_fr_normal = 85.0     # 提高前腿增益支持攀爬
+        kp_rl_rr_normal = 100.0    # 提高后腿增益增强推进力
+        kv_normal = 6.0            # 降低阻尼允许更积极的动作
+        
+        # 下坡：降低增益提高稳定性，防止蹦跳
+        kp_fl_fr_downhill = 75.0   # 下坡时前腿增益适中
+        kp_rl_rr_downhill = 90.0   # 下坡时后腿增益适中
+        kv_downhill = 7.0          # 下坡时适中阻尼
+        
+        # 混合参数
+        kp_fl_fr = np.where(is_downhill, kp_fl_fr_downhill, kp_fl_fr_normal)
+        kp_rl_rr = np.where(is_downhill, kp_rl_rr_downhill, kp_rl_rr_normal)
+        kv = np.where(is_downhill, kv_downhill, kv_normal)
         
         pos_error = target_pos - current_pos
-        torques = kp * pos_error - kv * current_vel
+        
+        # 分别计算前腿和后腿的力矩
+        torques = np.zeros_like(pos_error)
+        # 前腿 (FL, FR): 索引 0-2, 3-5
+        torques[:, 0:3] = kp_fl_fr[:, np.newaxis] * pos_error[:, 0:3] - kv[:, np.newaxis] * current_vel[:, 0:3]  # FL
+        torques[:, 3:6] = kp_fl_fr[:, np.newaxis] * pos_error[:, 3:6] - kv[:, np.newaxis] * current_vel[:, 3:6]  # FR
+        # 后腿 (RL, RR): 索引 6-8, 9-11
+        torques[:, 6:9] = kp_rl_rr[:, np.newaxis] * pos_error[:, 6:9] - kv[:, np.newaxis] * current_vel[:, 6:9]   # RL
+        torques[:, 9:12] = kp_rl_rr[:, np.newaxis] * pos_error[:, 9:12] - kv[:, np.newaxis] * current_vel[:, 9:12] # RR
         
         # 限制力矩范围（与XML中的forcerange一致）
         # hip/thigh: ±17 N·m, calf: ±34 N·m
@@ -559,24 +592,25 @@ class VBotSection013Env(NpEnv):
             #     print(f"[base_contact] base_contact_value (first 10): {display_data}")
             # else:
             #     print(f"[base_contact] base_contact_value: {base_contact_value}")
+            contact_threshold = 0.3  # base接触阈值(原始值为0.01,即一接触就结束)
             if base_contact_value.ndim == 0:
-                base_contact = np.array([base_contact_value > 0.01], dtype=bool)
+                base_contact = np.array([base_contact_value > contact_threshold], dtype=bool)
             elif base_contact_value.shape[0] != self._num_envs:
-                base_contact = np.full(self._num_envs, base_contact_value.flatten()[0] > 0.01, dtype=bool)
+                base_contact = np.full(self._num_envs, base_contact_value.flatten()[0] > contact_threshold, dtype=bool)
             else:
                 # base_contact = (base_contact_value > 0.01).flatten()[:self._num_envs]  # 数值大于0.01代表base已接触地面，可以触发终止条件了?
                 # 对每个环境检查是否有任何接触点超过阈值
-                base_contact = np.any(base_contact_value > 0.01, axis=1)[:self._num_envs]
+                base_contact = np.any(base_contact_value > contact_threshold, axis=1)[:self._num_envs]
         except Exception as e:
             print(f"[Warning] 无法读取base_contact传感器: {e}")
             base_contact = np.zeros(self._num_envs, dtype=bool)  
         # terminated = base_contact.copy()
         # 只打印前10条数据，如果条数小于10，打印全部
-        if hasattr(base_contact, '__len__'):
-            display_data = base_contact[:10] if len(base_contact) > 10 else base_contact
-            print(f"[base_contact] base_contact (first 10): {display_data}")
-        else:
-            print(f"[base_contact] base_contact: {base_contact}")
+        # if hasattr(base_contact, '__len__'):
+        #     display_data = base_contact[:10] if len(base_contact) > 10 else base_contact
+        #     print(f"[base_contact] base_contact (first 10): {display_data}")
+        # else:
+        #     print(f"[base_contact] base_contact: {base_contact}")
         terminated = np.logical_or(terminated, base_contact)
 
         # 陀螺仪三轴加速度传感器数据异常终止
@@ -599,11 +633,116 @@ class VBotSection013Env(NpEnv):
         
         return state.replace(terminated=terminated)
     
+    def _compute_slope_features(self, data: mtx.SceneData) -> dict:
+        """
+        计算坡度特征用于自适应步态调整
+        返回坡度相关信息：倾斜角度、方向等
+        """
+        # 方法1：使用新增的重力投影传感器（优先）
+        try:
+            # 获取重力在机器人坐标系中的投影
+            gravity_projection = self._model.get_sensor_value("gravity_projection", data)  # [num_envs, 3]
+            # 重力向量在机器人坐标系中应该指向下，即[0, 0, -1]
+            # 偏离程度反映坡度
+            gravity_xy_norm = np.linalg.norm(gravity_projection[:, :2], axis=1)
+            slope_angle = np.arctan2(gravity_xy_norm, np.abs(gravity_projection[:, 2]))
+            slope_direction = np.arctan2(gravity_projection[:, 1], gravity_projection[:, 0])
+        except Exception:
+            # 方法2：回退到基于四元数的计算
+            pose = self._body.get_pose(data)
+            root_quat = pose[:, 3:7]
+            projected_gravity = self._compute_projected_gravity(root_quat)
+            gravity_xy_norm = np.linalg.norm(projected_gravity[:, :2], axis=1)
+            slope_angle = np.arctan2(gravity_xy_norm, np.abs(projected_gravity[:, 2]))
+            slope_direction = np.arctan2(projected_gravity[:, 1], projected_gravity[:, 0])
+        
+        # 计算垂直速度变化率（用于判断上升/下降趋势）
+        base_lin_vel = self._model.get_sensor_value(self._cfg.sensor.base_linvel, data)
+        vertical_velocity = base_lin_vel[:, 2]  # Z轴速度
+        
+        return {
+            'slope_angle': slope_angle,             # 坡度角度
+            'slope_direction': slope_direction,     # 坡度方向
+            'vertical_velocity': vertical_velocity, # 垂直速度
+            'gravity_xy_norm': gravity_xy_norm,     # XY重力分量大小
+        }
+    
+    def _compute_foot_edge_distance(self, data: mtx.SceneData) -> np.ndarray:
+        """
+        计算足端到台阶边缘的距离，鼓励足端落在中心区域
+        返回平均足端边缘距离
+        """
+        # 获取足端位置（使用新增的传感器）
+        foot_positions = []
+        foot_sensor_names = ['FR_foot_pos', 'FL_foot_pos', 'RR_foot_pos', 'RL_foot_pos']
+        
+        for sensor_name in foot_sensor_names:
+            try:
+                foot_pos = self._model.get_sensor_value(sensor_name, data)  # [num_envs, 3]
+                foot_positions.append(foot_pos)
+            except Exception:
+                # 如果获取不到传感器数据，使用body位置作为备选
+                try:
+                    foot_body = self._model.get_body(sensor_name.split('_')[0] + '_foot')
+                    foot_pos = foot_body.get_pose(data)[:, :3]  # [num_envs, 3]
+                    foot_positions.append(foot_pos)
+                except Exception:
+                    # 如果都获取不到，返回默认值
+                    foot_positions.append(np.zeros((data.shape[0], 3), dtype=np.float32))
+        
+        if len(foot_positions) == 0:
+            return np.zeros(data.shape[0], dtype=np.float32)
+        
+        # 计算足端到最近台阶边缘的距离
+        # 简化模型：假设台阶宽度为0.3m，足端应落在中心±0.1m范围内
+        min_distances = []
+        for foot_pos in foot_positions:
+            # 计算到台阶中心线的距离（简化为X-Y平面距离）
+            # 假设台阶沿Y轴延伸，中心线为X=0
+            distance_to_center = np.abs(foot_pos[:, 0])  # 到中心线的横向距离
+            
+            # 限制在合理范围内（台阶半宽0.15m）
+            edge_distance = np.maximum(0.15 - distance_to_center, 0)  # 距离边缘的距离
+            min_distances.append(edge_distance)
+        
+        # 返回所有足端的平均边缘距离
+        avg_edge_distance = np.mean(np.stack(min_distances, axis=1), axis=1)
+        return avg_edge_distance
+    
+    def _compute_dynamic_stability_reward(self, data: mtx.SceneData, slope_features: dict) -> np.ndarray:
+        """
+        计算动力学稳定性奖励，考虑楼梯地形的垂直运动特性
+        """
+        # 获取基础传感器数据
+        base_lin_vel = self._model.get_sensor_value(self._cfg.sensor.base_linvel, data)
+        gyro = self._model.get_sensor_value(self._cfg.sensor.base_gyro, data)
+        
+        # 1. 垂直速度稳定性（楼梯升降运动）
+        vertical_vel = base_lin_vel[:, 2]
+        # 允许一定的垂直速度，但不能过大
+        vert_stability = np.exp(-np.square(vertical_vel) / (0.5**2))  # σ=0.5 m/s
+        
+        # 2. 角速度稳定性（特别是绕X/Y轴的倾斜）
+        ang_vel_magnitude = np.linalg.norm(gyro[:, :2], axis=1)  # X,Y轴角速度
+        ang_stability = np.exp(-np.square(ang_vel_magnitude) / (1.0**2))  # σ=1.0 rad/s
+        
+        # 3. 坡度适应性奖励
+        slope_angle = slope_features['slope_angle']
+        # 小坡度时给予奖励，大坡度时适度惩罚
+        slope_adaptation = np.exp(-np.square(slope_angle) / (np.pi/6)**2)  # σ=30°
+        
+        # 综合稳定性奖励
+        stability_reward = 0.4 * vert_stability + 0.3 * ang_stability + 0.3 * slope_adaptation
+        return stability_reward
+    
     def _compute_reward(self, data: mtx.SceneData, info: dict, velocity_commands: np.ndarray) -> np.ndarray:
         """
-        速度跟踪奖励机制
+        速度跟踪奖励机制（增强版：适配楼梯地形）
         velocity_commands: [num_envs, 3] - (vx, vy, vyaw)
         """
+        # 计算坡度特征
+        slope_features = self._compute_slope_features(data)
+        
         # 计算终止条件惩罚
         termination_penalty = np.zeros(self._num_envs, dtype=np.float32)
         
@@ -630,9 +769,9 @@ class VBotSection013Env(NpEnv):
         tilt_angle = np.arctan2(gxy, np.abs(gz))
         side_flip_mask = tilt_angle > np.deg2rad(75)
         termination_penalty = np.where(side_flip_mask, -20.0, termination_penalty)
-        print(f"[termination_penalty] side_flip_count={side_flip_mask.sum()}")
+        # print(f"[termination_penalty] side_flip_count={side_flip_mask.sum()}")
         
-        # 线速度跟踪奖励
+        # 线速度跟踪奖励（适配楼梯地形）
         base_lin_vel = self._model.get_sensor_value(self._cfg.sensor.base_linvel, data)
         lin_vel_error = np.sum(np.square(velocity_commands[:, :2] - base_lin_vel[:, :2]), axis=1)
         tracking_lin_vel = np.exp(-lin_vel_error / 0.25)  # tracking_sigma = 0.25
@@ -641,6 +780,24 @@ class VBotSection013Env(NpEnv):
         gyro = self._model.get_sensor_value(self._cfg.sensor.base_gyro, data)
         ang_vel_error = np.square(velocity_commands[:, 2] - gyro[:, 2])
         tracking_ang_vel = np.exp(-ang_vel_error / 0.25)
+        
+        # 1. 坡度自适应奖励
+        slope_angle = slope_features['slope_angle']
+        # 打印前10条数据，如果条数小于10，打印全部
+        if hasattr(slope_angle, '__len__'):
+            display_data = slope_angle[:10] if len(slope_angle) > 10 else slope_angle
+            print(f"[slope_angle] (first 10): {display_data}")
+        else:
+            print(f"[slope_angle]: {slope_angle}")
+        # 坡度适中时给予奖励（鼓励稳定的爬坡姿态）
+        slope_adaptation_reward = np.exp(-np.square(slope_angle) / (np.pi/8)**2)  # σ=22.5°
+        
+        # 2. 足端边缘距离奖励
+        foot_edge_distance = self._compute_foot_edge_distance(data)  # [num_envs]
+        edge_distance_reward = np.clip(foot_edge_distance / 0.15, 0, 1)  # 归一化到[0,1]
+        
+        # 3. 动力学稳定性奖励（考虑Z轴运动）
+        dyn_stability_reward = self._compute_dynamic_stability_reward(data, slope_features)
         
         # 获取机器人位置和朝向用于到达判定
         robot_position = pose[:, :2]
@@ -670,6 +827,7 @@ class VBotSection013Env(NpEnv):
             print(f"[reached_position] distance_to_target={distance_to_target}")
             # print(f"[reached_position] target_position={target_position}")
             # print(f"[reached_position] robot_position={robot_position}")
+            pass
         
         heading_threshold = np.deg2rad(15)
         reached_heading = np.abs(heading_diff) < heading_threshold
@@ -704,12 +862,10 @@ class VBotSection013Env(NpEnv):
         print("speed_xy 统计信息:")
         print(f"  最小值: {np.min(speed_xy)}")
         print(f"  最大值: {np.max(speed_xy)}")
-        # print(f"  绝对值最大值: {np.max(np.abs(speed_xy))}")
         gyro_z_calc = np.clip((np.abs(gyro_z_clipped) / 0.1)**4, 0, 100)  # 限制最小值为0，最大值为100
         print("gyro[:, 2] 统计信息:")
         print(f"  最小值: {np.min(gyro[:, 2])}")
         print(f"  最大值: {np.max(gyro[:, 2])}")
-        # print(f"  绝对值最大值: {np.max(np.abs(gyro[:, 2]))}")
         stop_base = 2 * (0.8 * np.exp(-speed_xy_calc) + 1.2 * np.exp(-gyro_z_calc))  # 到达后：停止奖励基础
         stop_bonus = np.where(reached_all, stop_base + zero_ang_bonus, 0.0)  # 到达后：停止奖励（包含停止奖励基础+零角速度 bonus）
         
@@ -730,7 +886,84 @@ class VBotSection013Env(NpEnv):
         action_diff = info["current_actions"] - info["last_actions"]
         action_rate_penalty = np.sum(np.square(action_diff), axis=1)
         
-        # 综合奖励
+        # ===== 新增：前进方向奖励机制 =====
+        # 鼓励机器人正面朝向运动方向，防止侧身或倒着走
+        movement_direction = np.arctan2(base_lin_vel[:, 1], base_lin_vel[:, 0] + 1e-6)  # 运动方向
+        forward_alignment = np.cos(movement_direction - robot_heading)  # 与朝向的对齐程度
+        forward_alignment_reward = np.clip(forward_alignment, 0, 1)  # 只奖励正面运动
+        
+        # ===== 新增：步态节奏奖励 =====
+        # 鼓励交替迈步的自然步态
+        foot_contact_pattern = np.zeros(self._num_envs, dtype=np.float32)
+        try:
+            # 简化的步态节奏检测：基于足端Z坐标变化
+            for i, foot_name in enumerate(['FR', 'FL', 'RR', 'RL']):
+                foot_pos_sensor = f'{foot_name}_foot_pos'
+                foot_pos = self._model.get_sensor_value(foot_pos_sensor, data)
+                # 检测足端离地高度
+                foot_height = foot_pos[:, 2]
+                # 简单的步态节奏奖励：鼓励足端有一定抬升
+                foot_contact_pattern += np.clip((foot_height - 0.05) * 2.0, 0, 1)
+        except:
+            foot_contact_pattern = np.zeros(self._num_envs, dtype=np.float32)
+        
+        # ===== 改进：楼梯攀登专用奖励 =====
+        # 垂直运动奖励：鼓励合理的上升下降
+        vertical_vel = slope_features['vertical_velocity']  # 从坡度特征中获取垂直速度
+        vertical_motion_reward = np.exp(-np.square(vertical_vel) / (1.0**2))  # σ=1.0 m/s
+        
+        # 楼梯台阶检测奖励
+        stair_step_reward = np.zeros(self._num_envs, dtype=np.float32)
+        # 简化检测：当有垂直速度且姿态稳定时给予奖励
+        stair_condition = np.logical_and(
+            np.abs(vertical_vel) > 0.1,  # 有明显的垂直运动
+            np.abs(slope_features['slope_angle']) < np.deg2rad(45)  # 坡度不太陡峭
+        )
+        stair_step_reward = np.where(stair_condition, 0.5, 0.0)
+        
+        # ===== 新增：地形状态检测 =====
+        # 1. 楼梯攀登状态检测
+        stair_climbing_state = np.zeros(self._num_envs, dtype=np.float32)
+        try:
+            # 简化检测：当前腿足端较高且有向上速度时认为在攀爬
+            for foot_name in ['FL', 'FR']:  # 前腿足端传感器
+                foot_pos_sensor = f'{foot_name}_foot_pos'
+                foot_pos = self._model.get_sensor_value(foot_pos_sensor, data)
+                foot_height = foot_pos[:, 2]
+                # 当前腿足端离地且有向上速度时判定为攀爬状态
+                climbing_condition = np.logical_and(
+                    foot_height > 0.1,  # 足端离地一定高度
+                    vertical_vel > 0.05  # 有向上的垂直速度
+                )
+                stair_climbing_state = np.maximum(stair_climbing_state, climbing_condition.astype(np.float32))
+        except:
+            stair_climbing_state = np.zeros(self._num_envs, dtype=np.float32)
+        
+        # 2. 下坡状态检测
+        slope_angle = slope_features['slope_angle']
+        is_downhill = np.logical_and(slope_angle < -np.deg2rad(8), slope_angle > -np.deg2rad(45))
+        downhill_state = is_downhill.astype(np.float32)
+        
+        # 3. 下坡稳定性奖励
+        # 下坡时鼓励稳定下降，避免剧烈动作
+        downhill_stability = np.zeros(self._num_envs, dtype=np.float32)
+        if np.any(is_downhill):
+            # 下坡时奖励较小的角速度和适当的前进速度
+            ang_vel_magnitude = np.linalg.norm(gyro[:, :2], axis=1)
+            forward_speed = np.linalg.norm(base_lin_vel[:, :2], axis=1)
+            # 下坡稳定性：角速度小 + 适度前进速度
+            downhill_stability = np.where(
+                is_downhill,
+                np.exp(-np.square(ang_vel_magnitude) / (0.5**2)) * np.clip(forward_speed / 1.0, 0, 1),
+                0.0
+            )
+        
+        # 楼梯攀登激励奖励
+        stair_climb_incentive = stair_climbing_state * 0.8  # 攀爬状态下给予额外奖励
+        # 下坡激励奖励
+        downhill_incentive = downhill_state * 0.6  # 下坡状态下给予适当奖励
+        
+        # 综合奖励（楼梯地形优化版 + 步态引导 + 攀爬激励）
         # 到达后：停止所有正向奖励，只保留停止奖励和惩罚项
         reward = np.where(
             reached_all,
@@ -738,32 +971,40 @@ class VBotSection013Env(NpEnv):
             (
                 stop_bonus
                 + arrival_bonus
-                - 2.0 * lin_vel_z_penalty
-                - 0.05 * ang_vel_xy_penalty
+                - 0.1 * lin_vel_z_penalty    # 极度减少Z轴惩罚，完全允许上下楼梯
+                - 0.01 * ang_vel_xy_penalty  # 进一步减少XY角速度惩罚
                 - 0.0 * orientation_penalty
-                # - 0.00001 * orientation_penalty
                 - 0.00001 * torque_penalty
                 - 0.0 * dof_vel_penalty
-                - 0.001 * action_rate_penalty
-                + termination_penalty  # 终止条件惩罚
+                - 0.0002 * action_rate_penalty  # 进一步减少动作变化惩罚
+                + termination_penalty
             ),
-            # 未到达：正常奖励
+            # 未到达：正常奖励（平衡激进性与稳定性）
             (
-                1.5 * tracking_lin_vel    # 提高X/Y轴线速度跟踪权重
-                + 0.3 * tracking_ang_vel  # 降低角速度权重
-                + approach_reward         # 接近奖励
-                - 2.0 * lin_vel_z_penalty  # Z轴线速度惩罚
-                - 0.05 * ang_vel_xy_penalty  # XY轴角速度惩罚
-                - 0.0 * orientation_penalty  # 姿态稳定性惩罚
-                - 0.00001 * torque_penalty  # 力矩惩罚（惩罚大力矩）
-                - 0.0 * dof_vel_penalty  # 关节速度惩罚
-                # - 0.001 * action_rate_penalty  # 动作变化惩罚（惩罚动作突变）
-                - 0.0001 * action_rate_penalty  # 动作变化惩罚（惩罚动作突变）
-                + termination_penalty  # 终止条件惩罚
+                0.85 * tracking_lin_vel      # 线速度跟踪（恢复权重）
+                + 0.25 * tracking_ang_vel    # 角速度跟踪（恢复权重）
+                + 1.0 * forward_alignment_reward  # 前进方向奖励
+                + 0.4 * foot_contact_pattern      # 步态节奏奖励
+                + approach_reward            # 接近奖励
+                + 0.35 * slope_adaptation_reward # 坡度适应奖励（恢复）
+                + 0.55 * edge_distance_reward    # 足端边缘距离奖励（提高）
+                + 0.35 * dyn_stability_reward    # 动力学稳定性奖励（提高）
+                + 0.6 * vertical_motion_reward   # 垂直运动奖励（提高）
+                + 0.7 * stair_step_reward        # 楼梯台阶奖励（提高）
+                + stair_climb_incentive          # 楼梯攀登激励奖励
+                + downhill_incentive             # 下坡激励奖励
+                + downhill_stability             # 下坡稳定性奖励
+                - 0.15 * lin_vel_z_penalty   # 适度减少Z轴惩罚
+                - 0.015 * ang_vel_xy_penalty # 适度减少XY角速度惩罚
+                - 0.0 * orientation_penalty
+                - 0.00001 * torque_penalty
+                - 0.0 * dof_vel_penalty
+                - 0.00008 * action_rate_penalty  # 适度减少动作变化惩罚
+                + termination_penalty
             )
         )
         
-        # 调试打印：到达一次性奖励、停止奖励、零角奖励、角速度
+        # 调试打印：扩展的楼梯地形调试信息
         try:
             arrival_count = int((arrival_bonus > 0).sum())
             stop_count = int((stop_bonus > 0).sum())
@@ -775,22 +1016,28 @@ class VBotSection013Env(NpEnv):
             reached_pos_count = int(reached_position.sum())
             reached_head_count = int(reached_heading.sum())
             
+            # 楼梯地形特有统计
+            slope_angle_deg = float(np.rad2deg(np.mean(slope_features['slope_angle'])))
+            vert_vel_mean = float(np.mean(np.abs(slope_features['vertical_velocity'])))
+            edge_dist_mean = float(np.mean(foot_edge_distance))
+            dyn_stab_mean = float(np.mean(dyn_stability_reward))
+            
             # 添加NaN检查和处理
             if np.any(np.isnan(distance_to_target)):
                 print(f"[Warning] distance_to_target contains NaN values, replacing with large values")
-                distance_to_target = np.where(np.isnan(distance_to_target), 1000.0, distance_to_target)  # 用大值替换NaN
+                distance_to_target = np.where(np.isnan(distance_to_target), 1000.0, distance_to_target)
             
             if np.any(np.isnan(heading_diff)):
                 print(f"[Warning] heading_diff contains NaN values, replacing with zero")
-                heading_diff = np.where(np.isnan(heading_diff), 0.0, heading_diff)  # 用0替换NaN
+                heading_diff = np.where(np.isnan(heading_diff), 0.0, heading_diff)
             
             if np.any(np.isnan(gyro_z_clipped)):
                 print(f"[Warning] gyro[:, 2] contains NaN values, replacing with zero")
-                gyro_z_clipped = np.where(np.isnan(gyro_z_clipped), 0.0, gyro_z_clipped)  # 用0替换NaN
+                gyro_z_clipped = np.where(np.isnan(gyro_z_clipped), 0.0, gyro_z_clipped)
             
             if np.any(np.isnan(reward)):
                 print(f"[Warning] reward contains NaN values, replacing with zero")
-                reward = np.where(np.isnan(reward), 0.0, reward)  # 用0替换NaN
+                reward = np.where(np.isnan(reward), 0.0, reward)
             
             dist_mean = float(np.mean(distance_to_target))
             heading_err_mean = float(np.rad2deg(np.mean(np.abs(heading_diff))))
@@ -799,8 +1046,8 @@ class VBotSection013Env(NpEnv):
             print(f"[reward_debug] arrival={arrival_count}/{total_envs} stop={stop_count}/{total_envs} zero_ang={zero_ang_count}/{total_envs}")
             print(f"[position] reached_pos={reached_pos_count}/{total_envs} dist_mean={dist_mean:.2f} m")
             print(f"[heading] reached_head={reached_head_count}/{total_envs} heading_err_mean={heading_err_mean:.1f}°")
-            print(f"[velocity] gyro_z_mean={gyro_z_mean:.4f} rad/s")
-            print(f"[orientation] orientation_penalty_mean={float(np.mean(orientation_penalty))}")
+            print(f"[velocity] gyro_z_mean={gyro_z_mean:.4f} rad/s vert_vel={vert_vel_mean:.3f} m/s")
+            print(f"[stairs] slope_angle={slope_angle_deg:.1f}° edge_dist={edge_dist_mean:.3f}m dyn_stab={dyn_stab_mean:.3f}")
             print(f"[reward] reward={reward_mean}")
         except Exception:
             pass
@@ -866,9 +1113,14 @@ class VBotSection013Env(NpEnv):
                 print(f"[Warning] Goal XY coordinates contain invalid values, using default targets")
             else:
                 # 使用goal位置作为目标范围中心
+                # target_positions = np.random.uniform(
+                #     low=np.abs(goal_xy) - 0.0,
+                #     high=np.abs(goal_xy) + 0.0,
+                #     size=(num_envs, 2)
+                # )
                 target_positions = np.random.uniform(
-                    low=np.abs(goal_xy) - 0.0,
-                    high=np.abs(goal_xy) + 0.0,
+                    low=goal_xy - self._cfg.init_state.pos_range,
+                    high=goal_xy + self._cfg.init_state.pos_range,
                     size=(num_envs, 2)
                 )
         # print("Target Positions:", target_positions)
