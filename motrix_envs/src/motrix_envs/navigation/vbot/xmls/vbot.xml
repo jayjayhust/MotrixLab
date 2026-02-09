@@ -6,8 +6,8 @@
   <default>
     <material specular="0" shininess="0.25"/>
     <default class="vita">
-      <geom friction="0.4" margin="0.001" condim="3" />
-      <joint axis="0 1 0" damping="0.1" armature="0.0043" frictionloss="0.2" />
+      <geom friction="0.6" margin="0.001" condim="3" />
+      <joint axis="0 1 0" damping="0.15" armature="0.0043" frictionloss="0.25" />
       <motor forcerange="-17 17" />
       <default class="R_hip_joint">
         <joint
@@ -40,9 +40,9 @@
                     range="-2.6387 -0.7854"
                     actuatorfrcrange="-34 34"
                     limited="true"
-                    damping="0.1"
+                    damping="0.15"
                     armature="0.04"
-                    frictionloss="0.2"
+                    frictionloss="0.3"
                 />
         <motor forcerange="-34 34" />
       </default>
@@ -52,7 +52,7 @@
       <default class="collision">
         <geom group="3" rgba="0.752941 0.752941 0.752941 1" />
         <default class="foot">
-          <geom size="0.021" quat="0.707107 -0.707107 0 0" pos="0 0 0" />
+          <geom size="0.021" quat="0.707107 -0.707107 0 0" pos="0 0 0" friction="0.8" />
         </default>
       </default>
     </default>
@@ -689,6 +689,15 @@
             pos="0.23 -0.3 0.09" quat="0.707107 0 0.707107 0"
             rgba="0 0 1 0.8" contype="0" conaffinity="0"/>
     </body>
+    
+    <!-- 楼梯辅助可视化标记 -->
+    <!-- 虚拟台阶边缘标记（仅用于调试可视化） -->
+    <body name="stair_edge_marker_1" pos="0 0 0.1" mocap="true">
+      <geom type="plane" size="0.01 0.5 0.01" rgba="1 0 0 0.3" contype="0" conaffinity="0"/>
+    </body>
+    <body name="stair_edge_marker_2" pos="0 0 0.2" mocap="true">
+      <geom type="plane" size="0.01 0.5 0.01" rgba="1 0 0 0.3" contype="0" conaffinity="0"/>
+    </body>
   </worldbody>
   
   <actuator>
@@ -817,5 +826,15 @@
     <!-- 位置和速度传感器 -->
     <framepos name="trunk_pos" objtype="site" objname="trunk_imu" />
     <framelinvel name="base_linvel" objtype="site" objname="trunk_imu" />
+    
+    <!-- 楼梯地形专用传感器 -->
+    <!-- 足端位置传感器（用于边缘距离计算） -->
+    <framepos name="FR_foot_pos" objtype="body" objname="FR_foot" />
+    <framepos name="FL_foot_pos" objtype="body" objname="FL_foot" />
+    <framepos name="RR_foot_pos" objtype="body" objname="RR_foot" />
+    <framepos name="RL_foot_pos" objtype="body" objname="RL_foot" />
+    
+    <!-- 重力投影传感器（用于坡度检测） -->
+    <framezaxis name="gravity_projection" objtype="site" objname="trunk_imu" />
   </sensor>
 </mujoco>
