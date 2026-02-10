@@ -21,18 +21,18 @@ from motrix_envs import registry
 from motrix_envs.np.env import NpEnv, NpEnvState
 from motrix_envs.math.quaternion import Quaternion
 
-from .cfg import VBotSection002EnvCfg
+from .cfg import VBotSection002WaypointEnvCfg
 
 
-@registry.env("vbot_navigation_section002", "np")
-class VBotSection002Env(NpEnv):
+@registry.env("vbot_navigation_section002_waypoint", "np")
+class VBotSection002WaypointEnv(NpEnv):
     """
     VBot在Section002地形上的导航任务
-    继承自NpEnv，使用VBotSection002EnvCfg配置
+    继承自NpEnv，使用VBotSection002WaypointEnvCfg配置
     """
-    _cfg: VBotSection002EnvCfg
+    _cfg: VBotSection002WaypointEnvCfg
     
-    def __init__(self, cfg: VBotSection002EnvCfg, num_envs: int = 1):
+    def __init__(self, cfg: VBotSection002WaypointEnvCfg, num_envs: int = 1):
         # 调用父类NpEnv初始化
         super().__init__(cfg, num_envs=num_envs)
         
@@ -74,6 +74,9 @@ class VBotSection002Env(NpEnv):
         print(f"self._model.actuator_names: {self._model.actuator_names}")  # 12 actuator
         print(f"self._model.joint_dof_pos_nums: {self._model.joint_dof_pos_nums}")
         print(f"self._model.joint_dof_vel_nums: {self._model.joint_dof_vel_nums}")
+                
+        # 初始化路径点相关变量
+        self._init_waypoint_system()
         
         # 查找target_marker的DOF索引
         self._find_target_marker_dof_indices()
@@ -136,6 +139,287 @@ class VBotSection002Env(NpEnv):
         if self._desired_arrow_dof_end <= len(self._init_dof_pos):
             self._init_dof_pos[self._desired_arrow_dof_start:self._desired_arrow_dof_end] = [0.0, 0.0, arrow_init_height, 0.0, 0.0, 0.0, 1.0]
     
+    def _init_waypoint_system(self):
+        """初始化路径点系统"""
+        # 从配置读取路径点信息
+        self.way_points = self._cfg.asset.way_point_names if hasattr(self._cfg.asset, 'way_point_names') else []
+        self.current_waypoint_index = np.zeros(self._num_envs, dtype=np.int32)  # per-env当前目标路径点索引
+        self.visited_waypoints = [set() for _ in range(self._num_envs)]  # per-env已访问的路径点集合
+        
+        # 按index字段排序路径点
+        self.way_points.sort(key=lambda wp: wp.get('index', 999))
+        
+        # 初始化路径点接触检测
+        self._init_waypoint_contact_detection()
+        
+        # --- Non-blocking special action state (per-env) ---
+        num_actuators = self._model.num_actuators
+        self._special_action_active = np.zeros(self._num_envs, dtype=bool)
+        self._special_action_step = np.zeros(self._num_envs, dtype=np.int32)
+        self._special_action_duration = np.zeros(self._num_envs, dtype=np.int32)
+        self._special_action_start_pos = np.zeros((self._num_envs, num_actuators), dtype=np.float32)
+        self._special_action_target_pos = np.zeros((self._num_envs, num_actuators), dtype=np.float32)
+
+        print(f"[Waypoint] Initialized {len(self.way_points)} waypoints (sorted by index)")
+        for i, wp in enumerate(self.way_points):
+            print(f"  [index={wp.get('index', 'N/A')}] {wp['name']} (action: {wp['action']})")
+    
+    def _init_waypoint_contact_detection(self):
+        """初始化路径点接触检测传感器"""
+        self.waypoint_contact_sensors = []
+        
+        for wp_info in self.way_points:
+            wp_name = wp_info['name']
+            # 传感器名称格式: waypoint_X-Y_body_contact (与XML中定义一致)
+            sensor_name = f"{wp_name}_contact"
+            print(f"[Waypoint] Checking sensor: {sensor_name}")
+            try:
+                # 检查传感器是否存在
+                # 创建临时数据对象用于传感器检查
+                temp_data = mtx.SceneData(self._model)
+                sensor_value = self._model.get_sensor_value(sensor_name, temp_data)
+                self.waypoint_contact_sensors.append({
+                    'name': wp_name,
+                    'sensor_name': sensor_name,
+                    'requires_action': wp_info['action'],
+                    'visited': np.zeros(self._num_envs, dtype=bool)
+                })
+                print(f"[Waypoint] Registered contact sensor for {wp_name}")
+            except Exception as e:
+                print(f"[Warning] Failed to register contact sensor for {wp_name}: {e}")
+                # 创建虚拟检测逻辑
+                self.waypoint_contact_sensors.append({
+                    'name': wp_name,
+                    'sensor_name': None,  # 标记为使用位置检测
+                    'requires_action': wp_info['action'],
+                    'visited': np.zeros(self._num_envs, dtype=bool)
+                })
+    
+    def _check_waypoint_reached(self, data: mtx.SceneData, root_pos: np.ndarray) -> list:
+        """检查是否到达路径点，返回已到达的路径点列表（每个包含per-env mask）"""
+        reached_waypoints = []
+        num_envs = root_pos.shape[0]
+        
+        for i, wp_sensor in enumerate(self.waypoint_contact_sensors):
+            wp_name = wp_sensor['name']
+            already_visited = wp_sensor['visited']  # np.ndarray(bool, num_envs)
+            
+            # 如果所有env都已经访问过，跳过
+            if np.all(already_visited):
+                continue
+            
+            reached = np.zeros(num_envs, dtype=bool)
+            
+            # 方法1：使用接触传感器检测
+            if wp_sensor['sensor_name'] is not None:
+                try:
+                    contact_value = self._model.get_sensor_value(wp_sensor['sensor_name'], data)
+                    if isinstance(contact_value, np.ndarray):
+                        if contact_value.ndim == 1:
+                            reached = contact_value > 0.1
+                        else:
+                            reached = np.any(contact_value > 0.1, axis=1)
+                        reached = reached.flatten()[:num_envs]
+                    else:
+                        reached[:] = contact_value > 0.1
+                except Exception:
+                    pass
+            
+            # 方法2：位置距离检测（备用方案，仅对尚未通过传感器检测到的env）
+            need_position_check = ~reached & ~already_visited
+            if np.any(need_position_check):
+                try:
+                    wp_body = self._model.get_body(wp_name)
+                    if wp_body is not None:
+                        wp_pos = wp_body.get_pose(data)[:, :3]  # [num_envs, 3]
+                        distance = np.linalg.norm(root_pos - wp_pos, axis=1)
+                        reached = reached | (distance < 0.5)
+                except Exception as e:
+                    print(f"[Warning] Cannot get position for waypoint {wp_name}: {e}")
+                    continue
+            
+            # 只保留新到达的env（排除已访问的）
+            newly_reached = reached & ~already_visited
+            
+            if np.any(newly_reached):
+                wp_sensor['visited'] = wp_sensor['visited'] | newly_reached
+                reached_waypoints.append({
+                    'index': i,
+                    'name': wp_name,
+                    'requires_action': wp_sensor['requires_action'],
+                    'env_mask': newly_reached,
+                })
+        
+        return reached_waypoints
+    
+    # ===== Special action angle definitions =====
+    _VICTORY_POSE_ANGLES = {
+        # Front legs: moderate raise with knee bend to keep CoM over rear support
+        "FR_hip_joint": -0.2, "FR_thigh_joint": 1.3, "FR_calf_joint": -1.0,
+        "FL_hip_joint": 0.2,  "FL_thigh_joint": 1.3, "FL_calf_joint": -1.0,
+        # Rear legs: crouched wider stance for a stable base
+        "RR_hip_joint": -0.1, "RR_thigh_joint": 0.6, "RR_calf_joint": -1.5,
+        "RL_hip_joint": 0.1,  "RL_thigh_joint": 0.6, "RL_calf_joint": -1.5,
+    }
+    _CROUCH_ANGLES = {
+        "FR_hip_joint": 0.0, "FR_thigh_joint": 1.5, "FR_calf_joint": -2.8,
+        "FL_hip_joint": 0.0, "FL_thigh_joint": 1.5, "FL_calf_joint": -2.8,
+        "RR_hip_joint": 0.0, "RR_thigh_joint": 1.2, "RR_calf_joint": -2.2,
+        "RL_hip_joint": 0.0, "RL_thigh_joint": 1.2, "RL_calf_joint": -2.2,
+    }
+    # Mapping: waypoint name -> (target_angles_dict, duration_steps)
+    _SPECIAL_ACTION_MAP = {
+        "wp_1-4_body": (_VICTORY_POSE_ANGLES, 150),
+        "wp_2-1_body": (_VICTORY_POSE_ANGLES, 150),
+        "wp_3-1_body": (_VICTORY_POSE_ANGLES, 150),
+    }
+    _DEFAULT_SPECIAL_ACTION = (_CROUCH_ANGLES, 50)
+
+    def _trigger_special_action_sequence(self, data: mtx.SceneData, waypoint_name: str, env_mask: np.ndarray):
+        """Initialize a non-blocking special action for the environments indicated by *env_mask*.
+
+        Instead of running a blocking loop, this records the target joint
+        positions so that `apply_action` can smoothly interpolate towards them
+        over subsequent simulation steps.
+        """
+        if not np.any(env_mask):
+            return
+
+        angles_dict, duration = self._SPECIAL_ACTION_MAP.get(
+            waypoint_name, self._DEFAULT_SPECIAL_ACTION
+        )
+        # print(f"[SpecialAction] Starting non-blocking action at {waypoint_name} "
+        #       f"for {int(env_mask.sum())} envs, duration={duration}")
+
+        current_joint_pos = self.get_dof_pos(data)  # [num_envs, num_actuators]
+        target_joint_pos = current_joint_pos.copy()
+
+        for i in range(self._model.num_actuators):
+            for joint_name, target_angle in angles_dict.items():
+                if joint_name in self._model.actuator_names[i]:
+                    target_joint_pos[env_mask, i] = target_angle
+                    break
+
+        self._special_action_active[env_mask] = True
+        self._special_action_step[env_mask] = 0
+        self._special_action_duration[env_mask] = duration
+        self._special_action_start_pos[env_mask] = current_joint_pos[env_mask]
+        self._special_action_target_pos[env_mask] = target_joint_pos[env_mask]
+
+    def _get_special_action_override(self) -> tuple[np.ndarray, np.ndarray]:
+        """Return (override_actions, active_mask) for environments running a special action.
+
+        The returned actions are in the same space as the RL agent output
+        (i.e. normalised offsets that `_compute_torques` expects).
+        """
+        active = self._special_action_active.copy()  # bool [num_envs], copy to avoid mutation
+        if not np.any(active):
+            return None, active
+
+        # Advance step counter
+        self._special_action_step[active] += 1
+
+        # Interpolation factor per env
+        alpha = np.clip(
+            self._special_action_step[active].astype(np.float32)
+            / np.maximum(self._special_action_duration[active].astype(np.float32), 1.0),
+            0.0, 1.0,
+        )
+
+        # Interpolated absolute target positions [active_count, num_actuators]
+        interp_pos = (
+            self._special_action_start_pos[active]
+            + alpha[:, np.newaxis] * (self._special_action_target_pos[active] - self._special_action_start_pos[active])
+        )
+
+        # Convert absolute joint targets to normalised RL actions:
+        #   target_pos = default_angles + actions * action_scale
+        #   => actions = (target_pos - default_angles) / action_scale
+        action_scale = self._cfg.control_config.action_scale
+        override_actions = (interp_pos - self.default_angles) / action_scale
+        # Clip to valid action range [-1, 1]
+        override_actions = np.clip(override_actions, -1.0, 1.0)
+
+        # Mark completed actions
+        done = self._special_action_step >= self._special_action_duration
+        newly_done = active & done
+        if np.any(newly_done):
+            # print(f"[SpecialAction] Completed for {int(newly_done.sum())} envs")
+            self._special_action_active[newly_done] = False
+            self._special_action_step[newly_done] = 0
+
+        return override_actions, active
+    
+    def _get_first_waypoint_pos(self, data: mtx.SceneData) -> np.ndarray:
+        """获取第一个路径点的坐标位置"""
+        # 从配置中查找index为0的路径点
+        first_waypoint = None
+        for wp in self.way_points:
+            if wp.get('index', -1) == 0:
+                first_waypoint = wp
+                break
+        
+        if first_waypoint is None:
+            print("[Warning] No waypoint with index 0 found, falling back to get_goal_pos")
+            return self.get_goal_pos(data)
+        
+        # 获取路径点body名称
+        waypoint_body_name = first_waypoint['name']
+        
+        try:
+            # 获取路径点body的坐标
+            waypoint_body = self._model.get_body(waypoint_body_name)
+            if waypoint_body is not None:
+                # 获取body的位置坐标 [x, y, z]
+                waypoint_pos = waypoint_body.get_pose(data)[:, :3]  # 只取位置部分
+                # print(f"[Waypoint] First waypoint '{waypoint_body_name}' position: {waypoint_pos[0]} (first 10)={waypoint_pos[:10] if len(waypoint_pos) > 10 else waypoint_pos}")
+                return waypoint_pos
+            else:
+                # print(f"[Warning] Waypoint body '{waypoint_body_name}' not found, falling back to get_goal_pos")
+                return self.get_goal_pos(data)
+        except Exception as e:
+            # print(f"[Warning] Failed to get position for waypoint '{waypoint_body_name}': {e}, falling back to get_goal_pos")
+            return self.get_goal_pos(data)
+    
+    def _update_goal_to_next_waypoint(self, current_goal: np.ndarray, data: mtx.SceneData, env_idx: int = 0) -> np.ndarray:
+        """更新目标位置到下一个未访问的路径点或最终目标（按index字段顺序, per-env）"""
+        # 按照index字段对路径点进行排序
+        sorted_waypoints = sorted(self.way_points, key=lambda wp: wp.get('index', 999))
+        
+        # 寻找下一个未访问的路径点（按index顺序）
+        for wp_info in sorted_waypoints:
+            # 跳过该env已访问的路径点
+            if wp_info['name'] in self.visited_waypoints[env_idx]:
+                continue
+                
+            # 获取该路径点的位置
+            try:
+                waypoint_body_name = wp_info['name']
+                waypoint_body = self._model.get_body(waypoint_body_name)
+                if waypoint_body is not None:
+                    # 通过body名称推导对应的geom名称来获取位置
+                    # body名称: waypoint_X-Y_body -> geom名称: waypoint_X-Y_trigger
+                    geom_suffix = waypoint_body_name.replace('_body', '_trigger')
+                    geom = self._model.get_geom(geom_suffix)
+                    if geom is not None:
+                        waypoint_pos = geom.get_pose(data)[:, :3]
+                    else:
+                        # 如果找不到geom，使用body的位置
+                        waypoint_pos = waypoint_body.get_pose(data)[:, :3]
+                    new_goal = waypoint_pos[env_idx].copy()  # 取对应环境的数据
+                    # print(f"[Waypoint] Updated goal to waypoint {wp_info['name']} (index={wp_info.get('index', 'N/A')}) at {new_goal[:2]}")
+                    return new_goal
+                else:
+                    print(f"[Warning] Waypoint body '{waypoint_body_name}' not found")
+                    continue
+            except Exception as e:
+                print(f"[Warning] Cannot get position for waypoint {wp_info['name']}: {e}")
+                continue
+        
+        # 如果没有更多路径点，返回最终目标
+        # print("[Waypoint] All waypoints visited, returning to final goal")
+        return current_goal
+    
     def _init_contact_geometry(self):
         """初始化接触检测所需的几何体索引"""
         self._init_termination_contact()
@@ -154,14 +438,15 @@ class VBotSection002Env(NpEnv):
             if geom_name is not None:
                 # 检查是否匹配任何一个地面前缀
                 for prefix in ground_prefixes:
-                    if prefix in geom_name and "ground" in geom_name.lower():
+                    if (prefix in geom_name) and (self._cfg.asset.ground_name in geom_name.lower()):
                         try:
                             geom_idx = self._model.get_geom_index(geom_name)
                             ground_geoms.append(geom_idx)
                             break  # 找到匹配就跳出内层循环
                         except Exception:
                             continue
-        
+        print(f"[Info] 地面前缀匹配结果: {ground_geoms}")
+
         # 构建碰撞对：每个基座geom × 每个地面geom
         termination_contact_list = []
         for base_geom_name in termination_contact_names:
@@ -227,6 +512,11 @@ class VBotSection002Env(NpEnv):
                 self.action_filter_alpha * actions + 
                 (1.0 - self.action_filter_alpha) * state.info["filtered_actions"]
             )
+        
+        # Override RL actions for envs with an active special action
+        override_actions, active_mask = self._get_special_action_override()
+        if override_actions is not None and np.any(active_mask):
+            state.info["filtered_actions"][active_mask] = override_actions
         
         state.info["current_actions"] = state.info["filtered_actions"]
 
@@ -470,6 +760,41 @@ class VBotSection002Env(NpEnv):
         target_position = pose_commands[:, :2]  # 目标位置
         target_heading = pose_commands[:, 2]  # 目标朝向
         
+        # ===== 路径点系统核心逻辑 =====
+        num_envs = root_pos.shape[0]
+        # 检查是否到达路径点
+        reached_waypoints = self._check_waypoint_reached(data, root_pos)
+        
+        # 如果到达了需要特殊动作的路径点，触发特殊动作
+        for wp in reached_waypoints:
+            env_mask = wp['env_mask']
+            for env_idx in range(num_envs):
+                if env_mask[env_idx]:
+                    self.visited_waypoints[env_idx].add(wp['name'])
+            if wp['requires_action']:
+                # print(f"[Waypoint] Special action triggered at {wp['name']}")
+                # 触发非阻塞特殊动作序列（仅对到达该路径点的环境）
+                self._trigger_special_action_sequence(data, wp['name'], wp['env_mask'])
+                
+        # 如果到达了路径点，per-env更新目标位置
+        if len(reached_waypoints) > 0:
+            for env_idx in range(num_envs):
+                any_reached = any(wp['env_mask'][env_idx] for wp in reached_waypoints)
+                if any_reached:
+                    new_goal_pos = self._update_goal_to_next_waypoint(
+                        np.array([target_position[env_idx, 0], target_position[env_idx, 1], 0.0]),
+                        data,
+                        env_idx,
+                    )
+                    pose_commands[env_idx, 0] = new_goal_pos[0]  # x
+                    pose_commands[env_idx, 1] = new_goal_pos[1]  # y
+            # 更新state.info中的目标命令
+            state.info["pose_commands"] = pose_commands
+            
+            # 更新目标位置变量
+            target_position = pose_commands[:, :2]
+        
+        
         # 计算位置误差
         position_error = target_position - robot_position  # 位置误差
         distance_to_target = np.linalg.norm(position_error, axis=1)
@@ -481,7 +806,16 @@ class VBotSection002Env(NpEnv):
         
         # 达到判定（只看位置，不看朝向，与奖励计算保持一致）
         position_threshold = 0.3
-        reached_all = distance_to_target < position_threshold  # 楼梯任务：只要到达位置即可
+        reached_position = distance_to_target < position_threshold  # 楼梯任务：只要到达位置即可
+        # reached_all只在到达最后一个路径点时才置位
+        if len(self.way_points) > 0:
+            all_waypoints_visited = np.array([
+                len(self.visited_waypoints[i]) >= len(self.way_points)
+                for i in range(num_envs)
+            ], dtype=bool)
+            reached_all = reached_position & all_waypoints_visited
+        else:
+            reached_all = reached_position
         
         # 计算期望速度命令（与平地navigation一致，简单P控制器）
         desired_vel_xy = np.clip(position_error * 1.0, -1.0, 1.0)
@@ -811,19 +1145,28 @@ class VBotSection002Env(NpEnv):
             display_target = target_position[:10] if len(target_position) > 10 else target_position
             display_robot = robot_position[:10] if len(robot_position) > 10 else robot_position
             # print(f"[reached_position] reached_position (first 10)={display_reached}")
-            print(f"[reached_position] distance_to_target (first 10)={display_distance}")
-            # print(f"[reached_position] target_position (first 10)={display_target}")
+            print(f"[reached_position] distance_to_target (first 10)={[f'{x:.5f}' for x in display_distance]}")
+            target_formatted = [f'[{float(row[0]):.2f}, {float(row[1]):.2f}]' for row in display_target]
+            print(f"[reached_position] target_position (first 10)={', '.join(target_formatted)}")
             # print(f"[reached_position] robot_position (first 10)={display_robot}")
         else:
             # print(f"[reached_position] reached_position={reached_position}")
-            print(f"[reached_position] distance_to_target={distance_to_target}")
-            # print(f"[reached_position] target_position={target_position}")
+            print(f"[reached_position] distance_to_target={[f'{x:.5f}' for x in display_distance]}")
+            target_formatted = [f'[{float(row[0]):.2f}, {float(row[1]):.2f}]' for row in display_target]
+            print(f"[reached_position] target_position={', '.join(target_formatted)}")
             # print(f"[reached_position] robot_position={robot_position}")
             pass
         
         heading_threshold = np.deg2rad(15)
         reached_heading = np.abs(heading_diff) < heading_threshold
         reached_all = np.logical_and(reached_position, reached_heading)
+        # reached_all只在到达最后一个路径点时才置位
+        if len(self.way_points) > 0:
+            all_waypoints_visited = np.array([
+                len(self.visited_waypoints[i]) >= len(self.way_points)
+                for i in range(self._num_envs)
+            ], dtype=bool)
+            reached_all = reached_all & all_waypoints_visited
         
         # 首次到达位置的一次性奖励
         info["ever_reached"] = info.get("ever_reached", np.zeros(self._num_envs, dtype=bool))
@@ -1041,9 +1384,35 @@ class VBotSection002Env(NpEnv):
             print(f"[velocity] gyro_z_mean={gyro_z_mean:.4f} rad/s vert_vel={vert_vel_mean:.3f} m/s")
             print(f"[stairs] slope_angle={slope_angle_deg:.1f}° edge_dist={edge_dist_mean:.3f}m dyn_stab={dyn_stab_mean:.3f}")
             print(f"[reward] reward={reward_mean}")
+            visited_list = [list(s) for s in self.visited_waypoints[:10]]
+            print(f"[waypoint] Visited_waypoints(first 10 envs): {visited_list}")
         except Exception:
             pass
         return reward
+
+    def _reset_done_envs(self):
+        """Override to properly reset per-env waypoint state for only the terminated envs."""
+        state = self._state
+        done = state.done
+        if not np.any(done):
+            return
+
+        # Get the actual env indices that are done
+        done_indices = np.where(done)[0]
+
+        # Reset waypoint system state for done envs only
+        self.current_waypoint_index[done_indices] = 0
+        for env_idx in done_indices:
+            self.visited_waypoints[env_idx].clear()
+        # Reset contact sensor visited state for done envs only
+        for wp_sensor in self.waypoint_contact_sensors:
+            wp_sensor['visited'][done_indices] = False
+        # Reset special action state for done envs only
+        self._special_action_active[done_indices] = False
+        self._special_action_step[done_indices] = 0
+
+        # Call parent to handle standard reset (obs, info, physics)
+        super()._reset_done_envs()
 
     def reset(self, data: mtx.SceneData, done: np.ndarray = None) -> tuple[np.ndarray, dict]:
         cfg: VBotSection001EnvCfg = self._cfg
@@ -1078,8 +1447,8 @@ class VBotSection002Env(NpEnv):
         # )
         # # 计算目标位置
         # target_positions = robot_init_pos + target_offset
-        # 目标位置为中心灯笼所在位置：获取goal参数
-        goal_pos = self.get_goal_pos(data)
+        # 目标位置为第一个路径点：从way_point_names中index为0的元素获取
+        goal_pos = self._get_first_waypoint_pos(data)
         # 检查goal_pos是否有效，如果无效则使用默认目标位置
         if goal_pos is None or np.any(np.isnan(goal_pos)) or np.any(np.isinf(goal_pos)):
             # 使用默认目标位置（场景中心附近）
@@ -1184,7 +1553,16 @@ class VBotSection002Env(NpEnv):
         distance_to_target = np.linalg.norm(position_error, axis=1)
         
         position_threshold = 0.3
-        reached_all = distance_to_target < position_threshold  # 楼梯任务：只看位置
+        reached_position = distance_to_target < position_threshold  # 楼梯任务：只看位置
+        # reached_all只在到达最后一个路径点时才置位
+        if len(self.way_points) > 0:
+            all_waypoints_visited = np.array([
+                len(self.visited_waypoints[i]) >= len(self.way_points)
+                for i in range(num_envs)
+            ], dtype=bool)
+            reached_all = reached_position & all_waypoints_visited
+        else:
+            reached_all = reached_position
         
         # 计算期望速度
         desired_vel_xy = np.clip(position_error * 1.0, -1.0, 1.0)
@@ -1271,6 +1649,8 @@ class VBotSection002Env(NpEnv):
             # 新增：与locomotion一致的字段
             "last_dof_vel": np.zeros((num_envs, self._num_action), dtype=np.float32),  # 上一步关节速度
             "contacts": np.zeros((num_envs, self.num_foot_check), dtype=np.bool_),  # 足部接触状态
+            # 路径点系统相关
+            "current_waypoint_index": np.zeros(num_envs, dtype=np.int32),  # per-env当前路径点索引
         }
         
         return obs, info

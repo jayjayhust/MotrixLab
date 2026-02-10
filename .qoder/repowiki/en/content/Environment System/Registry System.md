@@ -10,8 +10,17 @@
 - [go1/cfg.py](file://motrix_envs/src/motrix_envs/locomotion/go1/cfg.py)
 - [franka_lift_cube/cfg.py](file://motrix_envs/src/motrix_envs/manipulation/franka_lift_cube/cfg.py)
 - [anymal_c/cfg.py](file://motrix_envs/src/motrix_envs/navigation/anymal_c/cfg.py)
+- [vbot/cfg.py](file://motrix_envs/src/motrix_envs/navigation/vbot/cfg.py)
+- [vbot_section002_np.py](file://motrix_envs/src/motrix_envs/navigation/vbot/vbot_section002_np.py)
 - [__init__.py](file://motrix_envs/src/motrix_envs/__init__.py)
 </cite>
+
+## Update Summary
+**Changes Made**
+- Added documentation for the new VBotSection002Env class and its integration into the registry system
+- Updated VBot environment examples to include the new section002 navigation environment
+- Enhanced environment availability documentation to reflect the expanded VBot navigation suite
+- Updated practical examples to demonstrate the new VBotSection002Env registration and usage
 
 ## Table of Contents
 1. [Introduction](#introduction)
@@ -26,6 +35,8 @@
 
 ## Introduction
 This document explains the MotrixLab-S1 environment registry system, focusing on how the registry pattern centralizes environment configuration and implementation management. It covers the EnvMeta metadata container, the _envs dictionary registry, the registration decorators (@envcfg and @env), the environment lookup and backend selection mechanisms, and the dynamic instantiation process via the make() function. It also documents parameter validation, error handling, and configuration override capabilities, with practical examples for registering new environments, querying available environments, and handling backend compatibility.
+
+**Updated** The registry system now includes enhanced VBot navigation environments, specifically the VBotSection002Env class, which provides specialized navigation capabilities for section002 terrain configurations.
 
 ## Project Structure
 The registry system resides in the environment package and integrates with environment configurations and implementations across basic, locomotion, manipulation, and navigation domains. The registry module defines the central registry and supporting utilities, while environment-specific modules register their configurations and implementations.
@@ -43,6 +54,7 @@ BASIC["basic/<env>/cfg.py<br/>Basic environments"]
 LOCO["locomotion/<robot>/<task>_np.py<br/>Locomotion tasks"]
 MANIP["manipulation/<task>/cfg.py<br/>Manipulation tasks"]
 NAV["navigation/<robot>/cfg.py<br/>Navigation tasks"]
+VBOT["navigation/vbot/<env>_np.py<br/>VBot navigation environments"]
 end
 REG --> BASE
 REG --> NPE
@@ -50,6 +62,7 @@ INIT --> BASIC
 INIT --> LOCO
 INIT --> MANIP
 INIT --> NAV
+NAV --> VBOT
 ```
 
 **Diagram sources**
@@ -57,6 +70,8 @@ INIT --> NAV
 - [base.py](file://motrix_envs/src/motrix_envs/base.py#L1-L85)
 - [env.py](file://motrix_envs/src/motrix_envs/np/env.py#L1-L209)
 - [__init__.py](file://motrix_envs/src/motrix_envs/__init__.py#L1-L17)
+- [vbot/cfg.py](file://motrix_envs/src/motrix_envs/navigation/vbot/cfg.py#L1-L686)
+- [vbot_section002_np.py](file://motrix_envs/src/motrix_envs/navigation/vbot/vbot_section002_np.py#L1-L679)
 
 **Section sources**
 - [registry.py](file://motrix_envs/src/motrix_envs/registry.py#L1-L172)
@@ -292,6 +307,26 @@ Reference path:
 Reference path:
 - [registry.py](file://motrix_envs/src/motrix_envs/registry.py#L73-L74)
 
+#### Example 5: VBotSection002Env Registration and Usage
+**Updated** The VBotSection002Env demonstrates advanced navigation capabilities for section002 terrain:
+
+- Configuration registration: VBotSection002EnvCfg is registered with @envcfg("vbot_navigation_section002")
+- Implementation registration: VBotSection002Env is registered with @env("vbot_navigation_section002", "np")
+- Terrain-specific features: Includes specialized contact detection, target marker visualization, and section002-specific initialization parameters
+
+Reference paths:
+- Configuration: [vbot/cfg.py](file://motrix_envs/src/motrix_envs/navigation/vbot/cfg.py#L621-L686)
+- Implementation: [vbot_section002_np.py](file://motrix_envs/src/motrix_envs/navigation/vbot/vbot_section002_np.py#L40-L45)
+
+**Section sources**
+- [cartpole/cfg.py](file://motrix_envs/src/motrix_envs/basic/cartpole/cfg.py#L25-L31)
+- [bounce_ball_np.py](file://motrix_envs/src/motrix_envs/basic/bounce_ball/bounce_ball_np.py#L26-L31)
+- [go1/cfg.py](file://motrix_envs/src/motrix_envs/locomotion/go1/cfg.py#L122-L136)
+- [franka_lift_cube/cfg.py](file://motrix_envs/src/motrix_envs/manipulation/franka_lift_cube/cfg.py#L69-L83)
+- [anymal_c/cfg.py](file://motrix_envs/src/motrix_envs/navigation/anymal_c/cfg.py#L95-L115)
+- [vbot/cfg.py](file://motrix_envs/src/motrix_envs/navigation/vbot/cfg.py#L621-L686)
+- [vbot_section002_np.py](file://motrix_envs/src/motrix_envs/navigation/vbot/vbot_section002_np.py#L40-L45)
+
 ### Concrete Environment Examples
 - Basic environments: CartPole and BounceBall demonstrate minimal configuration and implementation registration.
   - [cartpole/cfg.py](file://motrix_envs/src/motrix_envs/basic/cartpole/cfg.py#L25-L31)
@@ -302,6 +337,9 @@ Reference path:
   - [franka_lift_cube/cfg.py](file://motrix_envs/src/motrix_envs/manipulation/franka_lift_cube/cfg.py#L69-L83)
 - Navigation environments: AnymalC demonstrates domain-specific configuration and reward structures.
   - [anymal_c/cfg.py](file://motrix_envs/src/motrix_envs/navigation/anymal_c/cfg.py#L95-L115)
+- **Updated** VBot navigation environments: Comprehensive suite including VBotSection002Env for specialized section002 terrain navigation.
+  - [vbot/cfg.py](file://motrix_envs/src/motrix_envs/navigation/vbot/cfg.py#L621-L686)
+  - [vbot_section002_np.py](file://motrix_envs/src/motrix_envs/navigation/vbot/vbot_section002_np.py#L40-L45)
 
 **Section sources**
 - [cartpole/cfg.py](file://motrix_envs/src/motrix_envs/basic/cartpole/cfg.py#L25-L31)
@@ -309,6 +347,8 @@ Reference path:
 - [go1/cfg.py](file://motrix_envs/src/motrix_envs/locomotion/go1/cfg.py#L122-L136)
 - [franka_lift_cube/cfg.py](file://motrix_envs/src/motrix_envs/manipulation/franka_lift_cube/cfg.py#L69-L83)
 - [anymal_c/cfg.py](file://motrix_envs/src/motrix_envs/navigation/anymal_c/cfg.py#L95-L115)
+- [vbot/cfg.py](file://motrix_envs/src/motrix_envs/navigation/vbot/cfg.py#L621-L686)
+- [vbot_section002_np.py](file://motrix_envs/src/motrix_envs/navigation/vbot/vbot_section002_np.py#L40-L45)
 
 ## Dependency Analysis
 The registry module depends on:
@@ -329,6 +369,8 @@ BOUNCE["basic/bounce_ball/bounce_ball_np.py"]
 GO1CFG["locomotion/go1/cfg.py"]
 FRANKA["manipulation/franka_lift_cube/cfg.py"]
 NAVCFG["navigation/anymal_c/cfg.py"]
+VBOTCFG["navigation/vbot/cfg.py"]
+VBOTENV["navigation/vbot/vbot_section002_np.py"]
 REG --> BASE
 REG --> NPE
 CARTCFG --> REG
@@ -336,6 +378,8 @@ BOUNCE --> REG
 GO1CFG --> REG
 FRANKA --> REG
 NAVCFG --> REG
+VBOTCFG --> REG
+VBOTENV --> REG
 ```
 
 **Diagram sources**
@@ -347,6 +391,8 @@ NAVCFG --> REG
 - [go1/cfg.py](file://motrix_envs/src/motrix_envs/locomotion/go1/cfg.py#L19-L20)
 - [franka_lift_cube/cfg.py](file://motrix_envs/src/motrix_envs/manipulation/franka_lift_cube/cfg.py#L21-L22)
 - [anymal_c/cfg.py](file://motrix_envs/src/motrix_envs/navigation/anymal_c/cfg.py#L19-L20)
+- [vbot/cfg.py](file://motrix_envs/src/motrix_envs/navigation/vbot/cfg.py#L19-L20)
+- [vbot_section002_np.py](file://motrix_envs/src/motrix_envs/navigation/vbot/vbot_section002_np.py#L20-L21)
 
 **Section sources**
 - [registry.py](file://motrix_envs/src/motrix_envs/registry.py#L19-L21)
@@ -381,4 +427,6 @@ Common issues and resolutions:
 - [__init__.py](file://motrix_envs/src/motrix_envs/__init__.py#L16-L16)
 
 ## Conclusion
-The MotrixLab-S1 environment registry system provides a clean, extensible pattern for managing environment configurations and implementations. Through EnvMeta and the _envs registry, it centralizes environment metadata and enables dynamic instantiation via make(). The @envcfg and @env decorators streamline registration, while configuration overrides and validation ensure flexibility and correctness. The system’s design facilitates environment composition, reuse, and backend compatibility, laying a solid foundation for scalable environment management across diverse robotics domains.
+The MotrixLab-S1 environment registry system provides a clean, extensible pattern for managing environment configurations and implementations. Through EnvMeta and the _envs registry, it centralizes environment metadata and enables dynamic instantiation via make(). The @envcfg and @env decorators streamline registration, while configuration overrides and validation ensure flexibility and correctness. The system's design facilitates environment composition, reuse, and backend compatibility, laying a solid foundation for scalable environment management across diverse robotics domains.
+
+**Updated** The recent addition of VBotSection002Env enhances the navigation environment suite, demonstrating the registry system's capability to accommodate specialized terrain configurations while maintaining seamless integration with the standard environment loading mechanisms. This expansion showcases the system's scalability and adaptability for complex robotic navigation scenarios.

@@ -106,8 +106,8 @@
   <worldbody>
 
     <body name="B_body" pos="0.0 0.0 0.0" quat="1.0 0.0 0.0 0.0">
+      <!-- <geom name="Way_Point_2" class="visual" mesh="V_LANTERN_BODY_BK" pos="0.0 24.0 2.5" quat="1.0 0.0 0.0 0.0" material="MI_LANTERN_BODY_BK"/> -->
       <geom name="End_Point_2" class="visual" mesh="V_LANTERN_BODY_BK" pos="0.0 24.0 2.5" quat="1.0 0.0 0.0 0.0" material="MI_LANTERN_BODY_BK"/>
-      <!-- <geom name="Way_Point_1" class="visual" mesh="V_LANTERN_BODY_BK" pos="-1 -2.5 2.5" quat="1.0 0.0 0.0 0.0" material="MI_LANTERN_BODY_BK"/> -->
       <geom class="visual" mesh="V_arrow_3_LIGHT" pos="-2.999999523162842 17.731996536254883 2.7990949153900146" quat="1.0 0.0 0.0 0.0" material="MI_white_light"/>
       <geom class="visual" mesh="V_bridge_barrier_BK" pos="-4.319393157958984 17.829622268676758 2.810610055923462" quat="1.0 0.0 0.0 0.0" material="MI_bridge_barrier_BK"/>
       <geom class="visual" mesh="V_bridge_Cylinder_BK" pos="-2.999999523162842 17.8212947845459 2.041141986846924" quat="1.0 0.0 0.0 0.0" material="MI_bridge_Cylinder_BK"/>

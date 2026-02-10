@@ -748,3 +748,119 @@ class VBotSection002EnvCfg(VBotStairsEnvCfg):
     noise_config: NoiseConfig = field(default_factory=NoiseConfig)
     reward_config: RewardConfig = field(default_factory=RewardConfig)
     asset: Asset = field(default_factory=Asset)
+
+@registry.envcfg("vbot_navigation_section002_waypoint")
+@dataclass
+class VBotSection002WaypointEnvCfg(VBotStairsEnvCfg):
+    """VBot Section002全地形训练配置"""
+    model_file: str = os.path.dirname(__file__) + "/xmls/scene_section002_waypoint.xml"
+    max_episode_seconds: float = 60.0  # 拉长：从20秒增加到60秒
+    max_episode_steps: int = 6000  # 拉长：从2000步增加到6000步（本回合步数到达后会重新开始训练）
+    sim_dt: float = 0.01    # 仿真步长 10ms = 100Hz
+    ctrl_dt: float = 0.01
+    reset_yaw_scale: float = 0.1
+    max_dof_vel: float = 100.0  # 最大关节速度阈值，训练初期给予更大容忍度
+    
+    @dataclass
+    class Asset:
+        body_name = "base"
+        foot_names = ["FR", "FL", "RR", "RL"]
+        terminate_after_contacts_on = ["collision_middle_box", "collision_head_box"]
+        # ground_subtree = "C_"  # 地形根节点，用于subtree接触检测
+        ground_subtree = "S1C_"  # 地形根节点，用于subtree接触检测
+        # 支持多个地面子树前缀的列表，用于全地形接触检测
+        ground_subtree_prefixes = ["S1C_", "S2C_", "S3C_"]  # 全地形地面子树前缀
+        ground_name = "diban"
+        goal_name = "S3V_End_Point_3"  # 目标位置名称，注意要加S3V_这个前缀（在scene_section002_waypoint.xml中进行了定义）
+        difficulty_mode = "easy"  # "simple", "easy", "normal", "hard"
+        # 根据difficulty_mode选择不同的路径点配置
+        WAYPOINT_CONFIGS = {
+            "simple": [  # 最简单,不带奖励点,驻留点不带庆祝动作
+                {"name": "wp_1-4_body", "index": 0, "action": False},
+                {"name": "wp_2-1_body", "index": 1, "action": False},
+                {"name": "wp_3-1_body", "index": 2, "action": False}
+            ],
+            "easy": [  # 简单一点,不带奖励点,驻留点带庆祝动作
+                {"name": "wp_1-4_body", "index": 0, "action": True},
+                {"name": "wp_2-1_body", "index": 1, "action": True},
+                {"name": "wp_3-1_body", "index": 2, "action": True}
+            ],
+            "normal": [  # 复杂一点,带3个奖励点,驻留点不带庆祝动作
+                {"name": "wp_1-2_body", "index": 0, "action": False},
+                {"name": "wp_1-1_body", "index": 1, "action": False},
+                {"name": "wp_1-3_body", "index": 2, "action": False},
+                {"name": "wp_1-4_body", "index": 3, "action": False},
+                {"name": "wp_2-1_body", "index": 4, "action": False},
+                {"name": "wp_3-1_body", "index": 5, "action": False}
+            ],
+            "hard": [  # 最复杂,带3个奖励点,驻留点全部带庆祝动作
+                {"name": "wp_1-2_body", "index": 0, "action": False},
+                {"name": "wp_1-1_body", "index": 1, "action": False},
+                {"name": "wp_1-3_body", "index": 2, "action": False},
+                {"name": "wp_1-4_body", "index": 3, "action": True},
+                {"name": "wp_2-1_body", "index": 4, "action": True},
+                {"name": "wp_3-1_body", "index": 5, "action": True}
+            ],
+        }
+        way_point_names = None  # 由__post_init__根据difficulty_mode自动设置
+
+        def __post_init__(self):
+            self.way_point_names = self.WAYPOINT_CONFIGS.get(
+                self.difficulty_mode, self.WAYPOINT_CONFIGS["simple"]
+            )
+        
+    @dataclass
+    class NoiseConfig:
+        level: float = 1
+        scale_joint_angle: float = 0.01
+        scale_joint_vel: float = 0.15
+        scale_gyro: float = 0.02
+        scale_gravity: float = 0.005
+        scale_linvel: float = 0.01
+
+    @dataclass
+    class InitState:
+        # 起始位置：随机化范围内生成
+        pos = [0.0, -3.0, 0.5]  # 机器人初始出生的中心位置(start point)
+        # pos = [0.0, -1.0, 0.5]  # 机器人初始出生的中心位置(波浪型地图中)
+        # pos = [0.0, 1.8, 0.5]  # 机器人初始出生的中心位置(跳过了波浪型地图，斜坡下平地)
+        pos_range = 0.1  # 位置随机范围：±0.1m（0.2m×0.2m区域）
+        pos_randomization_range = [-5.0, -5.0, 5.0, 5.0]  # X±5.0m, Y±5.0m随机
+
+        default_joint_angles = {
+            "FR_hip_joint": -0.0,     # 右前髋关节
+            "FR_thigh_joint": 0.95,   # 右前大腿（适中抬高）
+            "FR_calf_joint": -1.85,   # 右前小腿
+            "FL_hip_joint": 0.0,      # 左前髋关节
+            "FL_thigh_joint": 0.95,   # 左前大腿（适中抬高）
+            "FL_calf_joint": -1.85,   # 左前小腿
+            "RR_hip_joint": -0.0,     # 右后髋关节
+            "RR_thigh_joint": 0.85,   # 右后大腿（稍低提供推进力）
+            "RR_calf_joint": -1.75,   # 右后小腿
+            "RL_hip_joint": 0.0,      # 左后髋关节
+            "RL_thigh_joint": 0.85,   # 左后大腿（稍低提供推进力）
+            "RL_calf_joint": -1.75,   # 左后小腿
+        }
+
+    @dataclass
+    class Commands:
+        # 目标位置相对于机器人初始位置的偏移范围 [dx_min, dy_min, yaw_min, dx_max, dy_max, yaw_max]
+        # dx/dy: 相对机器人初始位置的偏移（米）
+        # yaw: 目标绝对朝向（弧度），水平方向随机
+        
+        # 原始配置（已注释）：
+        # 目标位置：固定在终止角范围远端（完全无随机化）
+        # 固定目标点: X=0, Y=10.2, Z=2 (Z通过XML控制)
+        # 起始位置Y=-2.4, 目标Y=10.2, 距离=12.6米
+        pose_command_range = [0.0, 10.2, 0.0, 0.0, 10.2, 0.0]
+
+    @dataclass
+    class ControlConfig:
+        action_scale = 0.2  # 楼梯navigation使用0.2，足够转向但比平地(0.25)更谨慎
+
+    init_state: InitState = field(default_factory=InitState)
+    commands: Commands = field(default_factory=Commands)
+    control_config: ControlConfig = field(default_factory=ControlConfig)
+    noise_config: NoiseConfig = field(default_factory=NoiseConfig)
+    reward_config: RewardConfig = field(default_factory=RewardConfig)
+    asset: Asset = field(default_factory=Asset)

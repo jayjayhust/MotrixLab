@@ -9,12 +9,6 @@
 - [vbot_section011_np.py](file://motrix_envs/src/motrix_envs/navigation/vbot/vbot_section011_np.py)
 - [vbot_section012_np.py](file://motrix_envs/src/motrix_envs/navigation/vbot/vbot_section012_np.py)
 - [vbot_section013_np.py](file://motrix_envs/src/motrix_envs/navigation/vbot/vbot_section013_np.py)
-- [vbot.xml](file://motrix_envs/src/motrix_envs/navigation/vbot/xmls/vbot.xml)
-- [scene.xml](file://motrix_envs/src/motrix_envs/navigation/vbot/xmls/scene.xml)
-- [scene_section001.xml](file://motrix_envs/src/motrix_envs/navigation/vbot/xmls/scene_section001.xml)
-- [scene_section011.xml](file://motrix_envs/src/motrix_envs/navigation/vbot/xmls/scene_section011.xml)
-- [scene_section012.xml](file://motrix_envs/src/motrix_envs/navigation/vbot/xmls/scene_section012.xml)
-- [scene_section013.xml](file://motrix_envs/src/motrix_envs/navigation/vbot/xmls/scene_section013.xml)
 </cite>
 
 ## Table of Contents
@@ -25,364 +19,274 @@
 5. [Detailed Component Analysis](#detailed-component-analysis)
 6. [Dependency Analysis](#dependency-analysis)
 7. [Performance Considerations](#performance-considerations)
-8. [Troubleshooting Guide](#troubleshooting-guide)
-9. [Conclusion](#conclusion)
+8. [Training Methodology](#training-methodology)
+9. [Curriculum Learning and Transfer Learning](#curriculum-learning-and-transfer-learning)
+10. [Troubleshooting Guide](#troubleshooting-guide)
+11. [Conclusion](#conclusion)
 
 ## Introduction
-This document describes the VBot navigation environments designed for wheeled robot navigation across multiple track sections. It covers the VBot robot implementation with omnidirectional movement capabilities, the modular track system comprising four distinct sections (001, 011, 012, 013), and the environment architecture supporting multi-section navigation scenarios. The documentation explains the configuration system for different track layouts, obstacle placement, and navigation objectives; details the observation space design incorporating wheel odometry, IMU data, and section-specific navigation cues; documents the reward shaping for track navigation including section completion bonuses, obstacle avoidance penalties, and path efficiency rewards; and outlines the training methodology for multi-section navigation, including curriculum learning approaches and transfer learning between different track configurations.
+This document describes the VBot navigation environments designed for wheeled robot navigation across multiple track sections. It covers the VBot robot implementation with omnidirectional movement capabilities, the modular track system featuring four distinct sections (001, 011, 012, 013), environment architecture for multi-section navigation, configuration systems for layouts and obstacles, observation space design incorporating wheel odometry, IMU data, and section-specific cues, reward shaping for navigation, and training methodologies including curriculum learning and transfer learning.
 
 ## Project Structure
-The VBot navigation module is organized around a shared robot model and per-section scene configurations. The core structure includes:
-- Robot model definition and sensors in the VBot XML
-- Environment classes for flat navigation and individual track sections
-- Configuration classes defining simulation parameters, noise, controls, commands, normalization, assets, sensors, and rewards
-- Scene XMLs that attach section-specific visual and collision models
+The VBot navigation module resides under navigation/vbot and exposes multiple environment variants via a central registry. Each variant encapsulates a specific track layout and associated configuration.
 
 ```mermaid
 graph TB
-subgraph "Robot Model"
-VBotXML["vbot.xml"]
-Sensors["Sensors & Actuators"]
+subgraph "VBot Navigation Module"
+A["__init__.py<br/>Exports VBot environments and configs"]
+B["cfg.py<br/>Environment configurations and sensors"]
+C["vbot_np.py<br/>Base flat terrain environment"]
+D["vbot_section001_np.py<br/>Flat section environment"]
+E["vbot_section011_np.py<br/>Section 01 terrain environment"]
+F["vbot_section012_np.py<br/>Section 02 terrain environment"]
+G["vbot_section013_np.py<br/>Section 03 terrain environment"]
 end
-subgraph "Environments"
-FlatEnv["VbotEnv<br/>(vbot_np.py)"]
-Sec001["VBotSection001Env<br/>(vbot_section001_np.py)"]
-Sec011["VBotSection011Env<br/>(vbot_section011_np.py)"]
-Sec012["VBotSection012Env<br/>(vbot_section012_np.py)"]
-Sec013["VBotSection013Env<br/>(vbot_section013_np.py)"]
-end
-subgraph "Scenes"
-SceneFlat["scene.xml"]
-SceneSec001["scene_section001.xml"]
-SceneSec011["scene_section011.xml"]
-SceneSec012["scene_section012.xml"]
-SceneSec013["scene_section013.xml"]
-end
-VBotXML --> Sensors
-SceneFlat --> VBotXML
-SceneSec001 --> VBotXML
-SceneSec011 --> VBotXML
-SceneSec012 --> VBotXML
-SceneSec013 --> VBotXML
-SceneFlat --> FlatEnv
-SceneSec001 --> Sec001
-SceneSec011 --> Sec011
-SceneSec012 --> Sec012
-SceneSec013 --> Sec013
+A --> B
+A --> C
+A --> D
+A --> E
+A --> F
+A --> G
 ```
 
 **Diagram sources**
-- [vbot.xml](file://motrix_envs/src/motrix_envs/navigation/vbot/xmls/vbot.xml#L1-L822)
-- [scene.xml](file://motrix_envs/src/motrix_envs/navigation/vbot/xmls/scene.xml#L1-L39)
-- [scene_section001.xml](file://motrix_envs/src/motrix_envs/navigation/vbot/xmls/scene_section001.xml#L1-L46)
-- [scene_section011.xml](file://motrix_envs/src/motrix_envs/navigation/vbot/xmls/scene_section011.xml#L1-L45)
-- [scene_section012.xml](file://motrix_envs/src/motrix_envs/navigation/vbot/xmls/scene_section012.xml#L1-L45)
-- [scene_section013.xml](file://motrix_envs/src/motrix_envs/navigation/vbot/xmls/scene_section013.xml#L1-L45)
-- [vbot_np.py](file://motrix_envs/src/motrix_envs/navigation/vbot/vbot_np.py#L39-L800)
-- [vbot_section001_np.py](file://motrix_envs/src/motrix_envs/navigation/vbot/vbot_section001_np.py#L40-L800)
-- [vbot_section011_np.py](file://motrix_envs/src/motrix_envs/navigation/vbot/vbot_section011_np.py#L40-L679)
-- [vbot_section012_np.py](file://motrix_envs/src/motrix_envs/navigation/vbot/vbot_section012_np.py#L40-L679)
-- [vbot_section013_np.py](file://motrix_envs/src/motrix_envs/navigation/vbot/vbot_section013_np.py#L40-L679)
+- [__init__.py](file://motrix_envs/src/motrix_envs/navigation/vbot/__init__.py#L17-L32)
+- [cfg.py](file://motrix_envs/src/motrix_envs/navigation/vbot/cfg.py#L118-L138)
+- [vbot_np.py](file://motrix_envs/src/motrix_envs/navigation/vbot/vbot_np.py#L39-L40)
+- [vbot_section001_np.py](file://motrix_envs/src/motrix_envs/navigation/vbot/vbot_section001_np.py#L40-L41)
+- [vbot_section011_np.py](file://motrix_envs/src/motrix_envs/navigation/vbot/vbot_section011_np.py#L40-L41)
+- [vbot_section012_np.py](file://motrix_envs/src/motrix_envs/navigation/vbot/vbot_section012_np.py#L40-L41)
+- [vbot_section013_np.py](file://motrix_envs/src/motrix_envs/navigation/vbot/vbot_section013_np.py#L40-L41)
 
 **Section sources**
-- [__init__.py](file://motrix_envs/src/motrix_envs/navigation/vbot/__init__.py#L17-L31)
-- [vbot.xml](file://motrix_envs/src/motrix_envs/navigation/vbot/xmls/vbot.xml#L1-L822)
-- [scene.xml](file://motrix_envs/src/motrix_envs/navigation/vbot/xmls/scene.xml#L1-L39)
-- [scene_section001.xml](file://motrix_envs/src/motrix_envs/navigation/vbot/xmls/scene_section001.xml#L1-L46)
-- [scene_section011.xml](file://motrix_envs/src/motrix_envs/navigation/vbot/xmls/scene_section011.xml#L1-L45)
-- [scene_section012.xml](file://motrix_envs/src/motrix_envs/navigation/vbot/xmls/scene_section012.xml#L1-L45)
-- [scene_section013.xml](file://motrix_envs/src/motrix_envs/navigation/vbot/xmls/scene_section013.xml#L1-L45)
+- [__init__.py](file://motrix_envs/src/motrix_envs/navigation/vbot/__init__.py#L17-L32)
 
 ## Core Components
-- VBot robot model: Defined in vbot.xml with articulated legs, collision geometry, visual assets, actuators, and sensors. The robot uses motorized joints with force limits and PD control via actuator targets.
-- Environment classes: Implement navigation tasks across flat and sectioned terrains. They define action spaces, observation spaces, reward computation, termination conditions, and state updates.
-- Configuration system: Centralized in cfg.py with dataclasses for noise, control, initialization, commands, normalization, assets, sensors, and reward scales. Each environment registers its own configuration class.
-- Scene configurations: Each section uses a dedicated scene XML that attaches section-specific visual and collision models while reusing the VBot robot definition.
+- Environment Registry and Registration: Environments are registered under names such as "vbot_navigation_flat", "vbot_navigation_section001", "vbot_navigation_section011", "vbot_navigation_section012", and "vbot_navigation_section013". These names are used to instantiate specific environment variants.
+- Configuration Classes: Centralized configuration classes define simulation parameters, noise models, control scaling, initialization states, command ranges, normalization factors, asset definitions, and sensor specifications for each environment variant.
+- Base Environment (Flat Terrain): Implements a base navigation loop with PD control, observation construction, reward computation, and termination logic suitable for flat terrains.
+- Section-Specific Environments: Specialized variants adapt control strategies, termination conditions, and reward shaping for different track sections, including slope-aware PD control and dynamic stability rewards.
 
-Key implementation highlights:
-- Action space: 12-dimensional control for leg joints
-- Observation space: 54-dimensional vector combining IMU, joint states, last actions, commands, and navigation cues
-- Reward shaping: Position tracking, fine position tracking, heading tracking, forward velocity bonus, stability penalties, termination penalties, and approach rewards
-- Termination: Base contact sensors, DOF velocity limits, side flip detection
+Key responsibilities:
+- Action application and PD torque computation
+- Observation extraction from sensors (IMU, joint states, commands)
+- Termination detection (contact, tilt, DOF limits)
+- Reward computation balancing tracking, stability, and completion
 
 **Section sources**
-- [vbot.xml](file://motrix_envs/src/motrix_envs/navigation/vbot/xmls/vbot.xml#L1-L822)
-- [vbot_np.py](file://motrix_envs/src/motrix_envs/navigation/vbot/vbot_np.py#L40-L800)
-- [vbot_section001_np.py](file://motrix_envs/src/motrix_envs/navigation/vbot/vbot_section001_np.py#L41-L800)
-- [vbot_section011_np.py](file://motrix_envs/src/motrix_envs/navigation/vbot/vbot_section011_np.py#L41-L679)
-- [vbot_section012_np.py](file://motrix_envs/src/motrix_envs/navigation/vbot/vbot_section012_np.py#L41-L679)
-- [vbot_section013_np.py](file://motrix_envs/src/motrix_envs/navigation/vbot/vbot_section013_np.py#L41-L679)
-- [cfg.py](file://motrix_envs/src/motrix_envs/navigation/vbot/cfg.py#L24-L138)
+- [cfg.py](file://motrix_envs/src/motrix_envs/navigation/vbot/cfg.py#L118-L138)
+- [vbot_np.py](file://motrix_envs/src/motrix_envs/navigation/vbot/vbot_np.py#L249-L291)
+- [vbot_section011_np.py](file://motrix_envs/src/motrix_envs/navigation/vbot/vbot_section011_np.py#L245-L299)
+- [vbot_section012_np.py](file://motrix_envs/src/motrix_envs/navigation/vbot/vbot_section012_np.py#L245-L299)
+- [vbot_section013_np.py](file://motrix_envs/src/motrix_envs/navigation/vbot/vbot_section013_np.py#L245-L299)
 
 ## Architecture Overview
-The VBot navigation architecture integrates a reusable robot model with modular track scenes. Environments inherit common logic for state extraction, action application, reward computation, and termination checks, while each section configures terrain geometry and goals.
+The VBot navigation architecture integrates a physics-based simulator with configurable environments. Each environment variant inherits common functionality while overriding section-specific aspects such as terrain geometry, asset definitions, and reward shaping.
 
 ```mermaid
 graph TB
 subgraph "Environment Layer"
-E_Flat["VbotEnv.update_state()"]
-E_Sec001["VBotSection001Env.update_state()"]
-E_Sec011["VBotSection011Env.update_state()"]
-E_Sec012["VBotSection012Env.update_state()"]
-E_Sec013["VBotSection013Env.update_state()"]
+EV["VBot Environments<br/>Flat + Sections"]
+CFG["Configuration Classes<br/>Noise, Control, Init, Commands,<br/>Normalization, Assets, Sensors"]
+OBS["Observation Space<br/>LinVel, Gyro, Gravity,<br/>Joint Pos/Vel, Last Actions,<br/>Commands, Pos/Error, Heading/Error,<br/>Distance, Reached, Stop Ready"]
+RWD["Reward Computation<br/>Tracking, Approach, Stability,<br/>Termination Penalties"]
+TERM["Termination Logic<br/>Contact, Tilt, DOF Limits"]
 end
-subgraph "Robot Layer"
-R_Model["VBot XML Model"]
-R_Sensors["IMU & Joint Sensors"]
-R_Actors["Motor Actuators"]
+subgraph "Physics Layer"
+SIM["Physics Engine<br/>Scene, Bodies, Contacts"]
+SENS["Sensors<br/>IMU, Joint Encoders, Contact Queries"]
 end
-subgraph "Scene Layer"
-S_Flat["scene.xml"]
-S_Sec001["scene_section001.xml"]
-S_Sec011["scene_section011.xml"]
-S_Sec012["scene_section012.xml"]
-S_Sec013["scene_section013.xml"]
-end
-S_Flat --> E_Flat
-S_Sec001 --> E_Sec001
-S_Sec011 --> E_Sec011
-S_Sec012 --> E_Sec012
-S_Sec013 --> E_Sec013
-E_Flat --> R_Model
-E_Sec001 --> R_Model
-E_Sec011 --> R_Model
-E_Sec012 --> R_Model
-E_Sec013 --> R_Model
-R_Model --> R_Sensors
-R_Model --> R_Actors
+EV --> CFG
+EV --> OBS
+EV --> RWD
+EV --> TERM
+RWD --> SENS
+OBS --> SENS
+TERM --> SENS
+SENS --> SIM
 ```
 
 **Diagram sources**
-- [vbot_np.py](file://motrix_envs/src/motrix_envs/navigation/vbot/vbot_np.py#L388-L503)
-- [vbot_section001_np.py](file://motrix_envs/src/motrix_envs/navigation/vbot/vbot_section001_np.py#L423-L538)
-- [vbot_section011_np.py](file://motrix_envs/src/motrix_envs/navigation/vbot/vbot_section011_np.py#L343-L458)
-- [vbot_section012_np.py](file://motrix_envs/src/motrix_envs/navigation/vbot/vbot_section012_np.py#L343-L458)
-- [vbot_section013_np.py](file://motrix_envs/src/motrix_envs/navigation/vbot/vbot_section013_np.py#L343-L458)
-- [vbot.xml](file://motrix_envs/src/motrix_envs/navigation/vbot/xmls/vbot.xml#L110-L692)
-- [scene.xml](file://motrix_envs/src/motrix_envs/navigation/vbot/xmls/scene.xml#L19-L38)
-- [scene_section001.xml](file://motrix_envs/src/motrix_envs/navigation/vbot/xmls/scene_section001.xml#L27-L44)
-- [scene_section011.xml](file://motrix_envs/src/motrix_envs/navigation/vbot/xmls/scene_section011.xml#L27-L44)
-- [scene_section012.xml](file://motrix_envs/src/motrix_envs/navigation/vbot/xmls/scene_section012.xml#L28-L44)
-- [scene_section013.xml](file://motrix_envs/src/motrix_envs/navigation/vbot/xmls/scene_section013.xml#L28-L44)
+- [cfg.py](file://motrix_envs/src/motrix_envs/navigation/vbot/cfg.py#L24-L138)
+- [vbot_np.py](file://motrix_envs/src/motrix_envs/navigation/vbot/vbot_np.py#L423-L538)
+- [vbot_section011_np.py](file://motrix_envs/src/motrix_envs/navigation/vbot/vbot_section011_np.py#L456-L571)
 
 ## Detailed Component Analysis
 
-### VBot Robot Implementation
-The VBot robot is defined in vbot.xml with:
-- Articulated legs (hip, thigh, calf) for omnidirectional movement
-- Collision geometry for base and feet
-- Visual assets and materials
-- Motorized actuators with force limits
-- Sensors for IMU and joint positions/velocities
+### VBot Robot Implementation and Control
+- Action Space: 12-dimensional motor control actions corresponding to joint targets.
+- PD Control: Torques computed using position and velocity errors with configurable gains and torque limits.
+- Actuation Model: Motor execution with force/torque limits matching XML specifications.
+- State Extraction: Root position/rotation, base linear velocity, and sensor readings (IMU, joint positions/velocities).
+- Observation Construction: Concatenation of normalized sensor data, last actions, commands, and task-related signals (position/heading errors, distance, reached flags).
 
 ```mermaid
-classDiagram
-class VBotRobot {
-+inertial_properties
-+collision_geoms
-+visual_meshes
-+motor_actuators
-+imu_sensor
-+joint_sensors
-}
-class Scene {
-+lighting
-+ground_plane
-+contact_sensors
-}
-VBotRobot --> Scene : "attached in scene XML"
+sequenceDiagram
+participant Agent as "Agent"
+participant Env as "VBot Environment"
+participant Sim as "Physics Scene"
+participant Ctrl as "PD Controller"
+Agent->>Env : "Actions (12-dim)"
+Env->>Ctrl : "Compute torques from actions"
+Ctrl->>Sim : "Apply actuator controls"
+Sim->>Env : "SceneData with sensor readings"
+Env->>Env : "Extract state, compute reward, check termination"
+Env-->>Agent : "Observation, reward, terminated"
 ```
 
 **Diagram sources**
-- [vbot.xml](file://motrix_envs/src/motrix_envs/navigation/vbot/xmls/vbot.xml#L110-L692)
-- [scene.xml](file://motrix_envs/src/motrix_envs/navigation/vbot/xmls/scene.xml#L19-L38)
+- [vbot_np.py](file://motrix_envs/src/motrix_envs/navigation/vbot/vbot_np.py#L249-L291)
+- [vbot_np.py](file://motrix_envs/src/motrix_envs/navigation/vbot/vbot_np.py#L388-L503)
 
 **Section sources**
-- [vbot.xml](file://motrix_envs/src/motrix_envs/navigation/vbot/xmls/vbot.xml#L1-L822)
-- [scene.xml](file://motrix_envs/src/motrix_envs/navigation/vbot/xmls/scene.xml#L1-L39)
+- [vbot_np.py](file://motrix_envs/src/motrix_envs/navigation/vbot/vbot_np.py#L62-L69)
+- [vbot_np.py](file://motrix_envs/src/motrix_envs/navigation/vbot/vbot_np.py#L249-L291)
+- [vbot_np.py](file://motrix_envs/src/motrix_envs/navigation/vbot/vbot_np.py#L388-L503)
 
-### Environment Classes and Observation Space
-Each environment class implements:
-- Action application with PD control and torque limiting
-- State extraction for base pose, velocities, and joint states
-- Observation construction combining IMU, joint states, last actions, and navigation cues
-- Reward computation with position tracking, approach rewards, stability penalties, and termination penalties
-- Termination detection via contact sensors and geometric checks
-
-Observation space composition (54 dimensions):
-- IMU linear acceleration and angular velocity
-- Projected gravity vector
-- Joint positions and velocities
-- Last actions
-- Command velocities and heading
-- Position error, heading error, distance to target
-- Reached flag and stop-ready flag
+### Modular Track System and Section-Specific Challenges
+- Section 001 (Flat): Designed for basic navigation tasks with controlled spawn regions and simplified termination logic.
+- Section 011 (Terrain 01): Introduces slope-aware PD control with adaptive gains and dynamic stability rewards.
+- Section 012 (Terrain 02): Similar to 011 with terrain-specific adaptations.
+- Section 013 (Terrain 03): Final section with specialized control and reward shaping.
 
 ```mermaid
 flowchart TD
-Start(["Reset or Step"]) --> Extract["Extract Base Pose & Velocities"]
-Extract --> Joints["Read Joint Positions & Velocities"]
-Joints --> Commands["Compute Desired Velocities & Yaw Rate"]
-Commands --> Observe["Build Observation Vector (54 dims)"]
-Observe --> Apply["Apply Actions (PD Control)"]
-Apply --> Sim["Simulate Physics"]
-Sim --> Reward["Compute Reward"]
-Reward --> Terminate{"Termination Check"}
-Terminate --> |No| NextStep["Next Step"]
-Terminate --> |Yes| Reset["Reset Episode"]
+Start(["Reset Environment"]) --> LoadCfg["Load Section Config"]
+LoadCfg --> Spawn["Spawn Robot and Target"]
+Spawn --> RunStep["Run Simulation Step"]
+RunStep --> Observe["Build Observation"]
+Observe --> ComputeReward["Compute Reward"]
+ComputeReward --> Terminate{"Terminated?"}
+Terminate --> |No| RunStep
+Terminate --> |Yes| Reset["Reset Environment"]
 ```
 
 **Diagram sources**
-- [vbot_np.py](file://motrix_envs/src/motrix_envs/navigation/vbot/vbot_np.py#L388-L503)
-- [vbot_section001_np.py](file://motrix_envs/src/motrix_envs/navigation/vbot/vbot_section001_np.py#L423-L538)
+- [vbot_section001_np.py](file://motrix_envs/src/motrix_envs/navigation/vbot/vbot_section001_np.py#L782-L800)
+- [vbot_section011_np.py](file://motrix_envs/src/motrix_envs/navigation/vbot/vbot_section011_np.py#L573-L634)
 
 **Section sources**
-- [vbot_np.py](file://motrix_envs/src/motrix_envs/navigation/vbot/vbot_np.py#L40-L800)
-- [vbot_section001_np.py](file://motrix_envs/src/motrix_envs/navigation/vbot/vbot_section001_np.py#L41-L800)
+- [vbot_section001_np.py](file://motrix_envs/src/motrix_envs/navigation/vbot/vbot_section001_np.py#L40-L106)
+- [vbot_section011_np.py](file://motrix_envs/src/motrix_envs/navigation/vbot/vbot_section011_np.py#L40-L106)
+- [vbot_section012_np.py](file://motrix_envs/src/motrix_envs/navigation/vbot/vbot_section012_np.py#L40-L106)
+- [vbot_section013_np.py](file://motrix_envs/src/motrix_envs/navigation/vbot/vbot_section013_np.py#L40-L106)
 
-### Track Sections and Transition Challenges
-The modular track system comprises four sections:
-- Section 001: Flat terrain with goal marker
-- Section 011: Flat terrain variant with different visual/collision models
-- Section 012: Intermediate terrain with specific obstacles and geometry
-- Section 013: Terminal terrain with distinct layout
+### Observation Space Design
+The observation vector aggregates:
+- IMU-derived signals: base linear velocity, angular velocity, projected gravity
+- Joint-level signals: joint positions (relative to default), joint velocities
+- Control history: last actions
+- Task commands: normalized desired velocity and yaw rate
+- Task metrics: position error, heading error, distance-to-target, reached flag, stop-ready flag
 
-Each section scene attaches section-specific visual and collision models while sharing the VBot robot definition. Transitions between sections require careful handling of goal positioning and terrain geometry.
-
-```mermaid
-graph LR
-Sec001["Section 001<br/>scene_section001.xml"] --> Sec011["Section 011<br/>scene_section011.xml"]
-Sec011 --> Sec012["Section 012<br/>scene_section012.xml"]
-Sec012 --> Sec013["Section 013<br/>scene_section013.xml"]
-```
-
-**Diagram sources**
-- [scene_section001.xml](file://motrix_envs/src/motrix_envs/navigation/vbot/xmls/scene_section001.xml#L27-L44)
-- [scene_section011.xml](file://motrix_envs/src/motrix_envs/navigation/vbot/xmls/scene_section011.xml#L27-L44)
-- [scene_section012.xml](file://motrix_envs/src/motrix_envs/navigation/vbot/xmls/scene_section012.xml#L28-L44)
-- [scene_section013.xml](file://motrix_envs/src/motrix_envs/navigation/vbot/xmls/scene_section013.xml#L28-L44)
+Dimensions and composition are standardized across environments to support transfer learning and consistent policy design.
 
 **Section sources**
-- [scene_section001.xml](file://motrix_envs/src/motrix_envs/navigation/vbot/xmls/scene_section001.xml#L1-L46)
-- [scene_section011.xml](file://motrix_envs/src/motrix_envs/navigation/vbot/xmls/scene_section011.xml#L1-L45)
-- [scene_section012.xml](file://motrix_envs/src/motrix_envs/navigation/vbot/xmls/scene_section012.xml#L1-L45)
-- [scene_section013.xml](file://motrix_envs/src/motrix_envs/navigation/vbot/xmls/scene_section013.xml#L1-L45)
+- [vbot_np.py](file://motrix_envs/src/motrix_envs/navigation/vbot/vbot_np.py#L423-L538)
 
 ### Reward Shaping for Navigation
-Rewards are composed of:
-- Position tracking and fine position tracking bonuses
-- Heading tracking component
-- Forward velocity bonus encouraging motion toward the target
-- Stability penalties for orientation deviation, vertical velocity, angular velocity, torques, joint velocities, and action rate
-- Termination penalty for unsafe states
-- Approach reward based on progress toward the target
-- Completion bonus upon reaching the target and stopping with minimal angular velocity
+Rewards balance multiple objectives:
+- Tracking rewards: exponential penalties on linear and angular velocity tracking errors
+- Approach reward: incentive for reducing distance to target
+- Stability penalties: Z-axis velocity, XY angular velocity, torque, joint velocity, action rate
+- Termination penalties: contact, tilt, excessive DOF velocity
+- Completion bonus: one-time arrival bonus and stopping bonus when stationary near target
 
 ```mermaid
 flowchart TD
-Compute["Compute Reward"] --> TrackingLin["Linear Velocity Tracking"]
-Compute --> TrackingAng["Angular Velocity Tracking"]
-Compute --> Approach["Approach Reward"]
-Compute --> Stability["Stability Penalties"]
-Compute --> Termination["Termination Penalty"]
-Compute --> Completion["Completion Bonus"]
-TrackingLin --> Sum["Sum Rewards"]
-TrackingAng --> Sum
-Approach --> Sum
-Stability --> Sum
-Termination --> Sum
-Completion --> Sum
+A["Compute Tracking Rewards"] --> B["Compute Approach Reward"]
+B --> C["Compute Stability Penalties"]
+C --> D["Compute Termination Penalties"]
+D --> E{"Reached Target?"}
+E --> |Yes| F["Add Arrival Bonus + Stop Bonus"]
+E --> |No| G["No Completion Bonuses"]
+F --> H["Aggregate Total Reward"]
+G --> H["Aggregate Total Reward"]
 ```
 
 **Diagram sources**
 - [vbot_np.py](file://motrix_envs/src/motrix_envs/navigation/vbot/vbot_np.py#L528-L685)
-- [vbot_section001_np.py](file://motrix_envs/src/motrix_envs/navigation/vbot/vbot_section001_np.py#L592-L780)
 
 **Section sources**
 - [vbot_np.py](file://motrix_envs/src/motrix_envs/navigation/vbot/vbot_np.py#L528-L685)
-- [vbot_section001_np.py](file://motrix_envs/src/motrix_envs/navigation/vbot/vbot_section001_np.py#L592-L780)
 
-### Training Methodology and Curriculum Learning
-Training methodology:
-- Flat navigation environment (VbotEnv) establishes baseline navigation skills
-- Section-specific environments (001, 011, 012, 013) introduce increasing complexity
-- Curriculum learning progression:
-  - Start with 001/011 (flat sections) to learn basic navigation
-  - Progress to 012 (intermediate terrain) to handle complexity
-  - End with 013 (terminal terrain) for final challenge
-- Transfer learning:
-  - Pre-train on simpler sections before training on harder ones
-  - Use learned policies as initialization for subsequent sections
-  - Share configuration parameters (noise, normalization, control scaling) across sections
+### Termination Conditions
+Termination is triggered by:
+- Base contact sensor exceeding threshold
+- Side flip detection via projected gravity tilt
+- Excessive DOF velocities or numerical instability
+- Timeouts based on episode steps
+
+These conditions ensure safe and meaningful episodes for training.
 
 **Section sources**
-- [cfg.py](file://motrix_envs/src/motrix_envs/navigation/vbot/cfg.py#L357-L619)
-- [vbot_section001_np.py](file://motrix_envs/src/motrix_envs/navigation/vbot/vbot_section001_np.py#L494-L678)
-- [vbot_section011_np.py](file://motrix_envs/src/motrix_envs/navigation/vbot/vbot_section011_np.py#L494-L678)
-- [vbot_section012_np.py](file://motrix_envs/src/motrix_envs/navigation/vbot/vbot_section012_np.py#L494-L678)
-- [vbot_section013_np.py](file://motrix_envs/src/motrix_envs/navigation/vbot/vbot_section013_np.py#L494-L678)
+- [vbot_np.py](file://motrix_envs/src/motrix_envs/navigation/vbot/vbot_np.py#L505-L526)
+- [vbot_section011_np.py](file://motrix_envs/src/motrix_envs/navigation/vbot/vbot_section011_np.py#L573-L634)
 
 ## Dependency Analysis
-The environment classes depend on the VBot robot model and scene configurations. Each environment registers its configuration class and inherits common functionality from the base environment class.
+The VBot navigation module depends on:
+- Registry for environment registration and lookup
+- Configuration classes for environment-specific parameters
+- Physics engine for scene simulation and sensor queries
+- Math utilities for quaternion operations
 
 ```mermaid
 graph TB
-Cfg["cfg.py<br/>Configuration Classes"] --> EnvBase["Base Environment Classes"]
-EnvBase --> VbotEnv["VbotEnv"]
-EnvBase --> Sec001["VBotSection001Env"]
-EnvBase --> Sec011["VBotSection011Env"]
-EnvBase --> Sec012["VBotSection012Env"]
-EnvBase --> Sec013["VBotSection013Env"]
-VBotXML["vbot.xml"] --> VbotEnv
-VBotXML --> Sec001
-VBotXML --> Sec011
-VBotXML --> Sec012
-VBotXML --> Sec013
-SceneFlat["scene.xml"] --> VbotEnv
-SceneSec001["scene_section001.xml"] --> Sec001
-SceneSec011["scene_section011.xml"] --> Sec011
-SceneSec012["scene_section012.xml"] --> Sec012
-SceneSec013["scene_section013.xml"] --> Sec013
+REG["Registry<br/>Registers environments"]
+CFG["Config Classes<br/>Per-environment settings"]
+ENV["Environments<br/>Base + Sections"]
+MATH["Quaternion Utilities"]
+SIM["Physics Engine"]
+REG --> ENV
+CFG --> ENV
+ENV --> MATH
+ENV --> SIM
 ```
 
 **Diagram sources**
-- [cfg.py](file://motrix_envs/src/motrix_envs/navigation/vbot/cfg.py#L118-L619)
-- [vbot_np.py](file://motrix_envs/src/motrix_envs/navigation/vbot/vbot_np.py#L39-L800)
-- [vbot_section001_np.py](file://motrix_envs/src/motrix_envs/navigation/vbot/vbot_section001_np.py#L40-L800)
-- [vbot_section011_np.py](file://motrix_envs/src/motrix_envs/navigation/vbot/vbot_section011_np.py#L40-L679)
-- [vbot_section012_np.py](file://motrix_envs/src/motrix_envs/navigation/vbot/vbot_section012_np.py#L40-L679)
-- [vbot_section013_np.py](file://motrix_envs/src/motrix_envs/navigation/vbot/vbot_section013_np.py#L40-L679)
-- [vbot.xml](file://motrix_envs/src/motrix_envs/navigation/vbot/xmls/vbot.xml#L1-L822)
-- [scene.xml](file://motrix_envs/src/motrix_envs/navigation/vbot/xmls/scene.xml#L1-L39)
-- [scene_section001.xml](file://motrix_envs/src/motrix_envs/navigation/vbot/xmls/scene_section001.xml#L1-L46)
-- [scene_section011.xml](file://motrix_envs/src/motrix_envs/navigation/vbot/xmls/scene_section011.xml#L1-L45)
-- [scene_section012.xml](file://motrix_envs/src/motrix_envs/navigation/vbot/xmls/scene_section012.xml#L1-L45)
-- [scene_section013.xml](file://motrix_envs/src/motrix_envs/navigation/vbot/xmls/scene_section013.xml#L1-L45)
+- [__init__.py](file://motrix_envs/src/motrix_envs/navigation/vbot/__init__.py#L17-L32)
+- [cfg.py](file://motrix_envs/src/motrix_envs/navigation/vbot/cfg.py#L19-L20)
+- [vbot_np.py](file://motrix_envs/src/motrix_envs/navigation/vbot/vbot_np.py#L21-L23)
 
 **Section sources**
-- [__init__.py](file://motrix_envs/src/motrix_envs/navigation/vbot/__init__.py#L17-L31)
-- [cfg.py](file://motrix_envs/src/motrix_envs/navigation/vbot/cfg.py#L118-L619)
+- [__init__.py](file://motrix_envs/src/motrix_envs/navigation/vbot/__init__.py#L17-L32)
+- [cfg.py](file://motrix_envs/src/motrix_envs/navigation/vbot/cfg.py#L19-L20)
+- [vbot_np.py](file://motrix_envs/src/motrix_envs/navigation/vbot/vbot_np.py#L21-L23)
 
 ## Performance Considerations
-- Simulation step size and control frequency: The environments specify sim_dt and ctrl_dt to balance fidelity and speed.
-- Action filtering: A simple exponential filter smooths actions to reduce jitter.
-- Torque limiting: PD control applies torque limits matching motor force ranges.
-- Observation normalization: Normalization factors stabilize learning across different scales.
-- Termination safety: DOF velocity thresholds and side-flip detection prevent unstable episodes.
+- Action filtering: Exponential smoothing of actions reduces jitter and improves control stability.
+- Normalization: Observations and commands are normalized to stabilize training dynamics.
+- PD gains: Tuned gains balance responsiveness and stability; adaptive gains in sloped sections improve robustness.
+- Termination thresholds: Carefully tuned thresholds prevent premature termination while ensuring safety.
+
+[No sources needed since this section provides general guidance]
+
+## Training Methodology
+- Flat Base Training: Start with the flat terrain environment to learn basic navigation skills (position/heading tracking, obstacle avoidance).
+- Section-wise Pretraining: Train on individual sections to learn section-specific behaviors (slopes, transitions).
+- Curriculum Scaling: Gradually increase difficulty by expanding target ranges, increasing episode durations, and introducing more complex layouts.
+- Multi-Section Training: Combine sections into longer courses to practice continuous navigation across transitions.
+
+[No sources needed since this section provides general guidance]
+
+## Curriculum Learning and Transfer Learning
+- Curriculum Learning: Progress from simple flat navigation to complex sections, adjusting action scales, noise levels, and episode durations.
+- Transfer Learning: Use pre-trained policies from simpler sections as initialization for harder sections. Shared observation/action spaces facilitate cross-task adaptation.
+- Section Interleaving: Alternate between sections during training to improve generalization across diverse track layouts.
 
 [No sources needed since this section provides general guidance]
 
 ## Troubleshooting Guide
-Common issues and resolutions:
-- Contact sensor availability: Some environments rely on base contact sensors; missing sensors can cause termination logic to fail silently. Verify sensor names and availability in the scene XML.
-- Numerical stability: Observations and rewards include clipping and exponential terms; NaN handling is implemented to maintain training stability.
-- Termination detection: Termination contact pairs are constructed from base and ground geometries; ensure geometry names match between model and environment configuration.
-- Observation dimensionality: Ensure observation concatenation matches the declared 54-dimension space.
+Common issues and remedies:
+- Excessive termination due to contact sensors: Adjust contact thresholds and ensure proper sensor calibration.
+- Instability on slopes: Reduce action scale and enable adaptive PD gains in sloped environments.
+- Poor convergence: Verify normalization parameters and reward shaping balances; consider curriculum progression.
+- Numerical instabilities: Monitor DOF velocity limits and apply appropriate penalties to prevent extreme states.
 
 **Section sources**
-- [vbot_np.py](file://motrix_envs/src/motrix_envs/navigation/vbot/vbot_np.py#L505-L526)
-- [vbot_section001_np.py](file://motrix_envs/src/motrix_envs/navigation/vbot/vbot_section001_np.py#L540-L590)
-- [scene.xml](file://motrix_envs/src/motrix_envs/navigation/vbot/xmls/scene.xml#L24-L37)
+- [vbot_section011_np.py](file://motrix_envs/src/motrix_envs/navigation/vbot/vbot_section011_np.py#L573-L634)
+- [vbot_section012_np.py](file://motrix_envs/src/motrix_envs/navigation/vbot/vbot_section012_np.py#L573-L634)
+- [vbot_section013_np.py](file://motrix_envs/src/motrix_envs/navigation/vbot/vbot_section013_np.py#L573-L634)
 
 ## Conclusion
-The VBot navigation environments provide a robust framework for training wheeled robots across multiple track sections. The modular design enables curriculum learning and transfer between sections, while the configuration system offers flexibility for noise, control, and reward shaping. The observation space and reward design emphasize navigation accuracy, stability, and efficient path completion, enabling effective policy learning across diverse terrains.
+The VBot navigation environments provide a flexible, modular framework for training wheeled robots across diverse track sections. With carefully designed observation spaces, reward shaping, and section-specific adaptations, the system supports effective curriculum learning and transfer learning strategies. The centralized configuration system and environment registry simplify experimentation and deployment across multiple track layouts.

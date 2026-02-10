@@ -10,8 +10,18 @@
 - [anymal_c_loco_cfg.py](file://motrix_envs/src/motrix_envs/locomotion/anymal_c/cfg.py)
 - [franka_lift_cube_cfg.py](file://motrix_envs/src/motrix_envs/manipulation/franka_lift_cube/cfg.py)
 - [anymal_c_nav_cfg.py](file://motrix_envs/src/motrix_envs/navigation/anymal_c/cfg.py)
+- [go1_loco_cfg.py](file://motrix_envs/src/motrix_envs/locomotion/go1/cfg.py)
+- [go2_loco_cfg.py](file://motrix_envs/src/motrix_envs/locomotion/go2/cfg.py)
+- [vbot_nav_cfg.py](file://motrix_envs/src/motrix_envs/navigation/vbot/cfg.py)
 - [reward_tolerance.py](file://motrix_envs/src/motrix_envs/np/reward.py)
 </cite>
+
+## Update Summary
+**Changes Made**
+- Enhanced NoiseConfig class documentation with detailed parameter explanations
+- Updated VBotSection012 initial spawn position from [0.0, -2.5, 0.5] to [0.0, 10, 2.0]
+- Added comprehensive coverage of noise modeling capabilities across locomotion environments
+- Expanded configuration inheritance patterns documentation
 
 ## Table of Contents
 1. [Introduction](#introduction)
@@ -27,6 +37,8 @@
 
 ## Introduction
 This document explains the MotrixLab-S1 environment configuration management system with a focus on the EnvCfg dataclass, parameter validation, inheritance patterns, and environment-specific configuration classes. It covers how defaults are set, how overrides work, and how validation ensures safe simulation parameters. It also documents the configuration serialization and persistence mechanisms, and provides practical examples for creating custom configurations and enforcing environment-specific constraints.
+
+**Updated** Enhanced with comprehensive noise modeling capabilities through the NoiseConfig class, providing configurable scales for joint angles, velocities, gyroscopes, gravity, and linear velocities across locomotion environments.
 
 ## Project Structure
 The configuration system centers around a shared EnvCfg base class and a registry-driven factory that constructs environment instances from typed configuration classes. Environment families (basic, locomotion, manipulation, navigation) define specialized configuration classes that inherit from EnvCfg and add domain-specific parameters.
@@ -46,18 +58,24 @@ C2["basic/cartpole/cartpole_np.py<br/>CartPoleEnv"]
 end
 subgraph "Locomotion"
 L1["locomotion/anymal_c/cfg.py<br/>AnymalCEnvCfg + nested configs"]
+L2["locomotion/go1/cfg.py<br/>Go1EnvCfg + NoiseConfig"]
+L3["locomotion/go2/cfg.py<br/>Go2EnvCfg + NoiseConfig"]
 end
 subgraph "Manipulation"
 M1["manipulation/franka_lift_cube/cfg.py<br/>FrankaLiftCubeEnvCfg + nested configs"]
 end
 subgraph "Navigation"
 N1["navigation/anymal_c/cfg.py<br/>AnymalCEnvCfg + nested configs"]
+N2["navigation/vbot/cfg.py<br/>VBotEnvCfg + NoiseConfig + Spawn Positions"]
 end
 B1 --> R1
 R1 --> C1
 R1 --> L1
+R1 --> L2
+R1 --> L3
 R1 --> M1
 R1 --> N1
+R1 --> N2
 C1 --> C2
 B1 --> NP1
 NP1 --> C2
@@ -72,6 +90,9 @@ NP1 --> C2
 - [anymal_c_loco_cfg.py](file://motrix_envs/src/motrix_envs/locomotion/anymal_c/cfg.py#L110-L129)
 - [franka_lift_cube_cfg.py](file://motrix_envs/src/motrix_envs/manipulation/franka_lift_cube/cfg.py#L69-L84)
 - [anymal_c_nav_cfg.py](file://motrix_envs/src/motrix_envs/navigation/anymal_c/cfg.py#L95-L116)
+- [go1_loco_cfg.py](file://motrix_envs/src/motrix_envs/locomotion/go1/cfg.py#L23-L31)
+- [go2_loco_cfg.py](file://motrix_envs/src/motrix_envs/locomotion/go2/cfg.py#L25-L33)
+- [vbot_nav_cfg.py](file://motrix_envs/src/motrix_envs/navigation/vbot/cfg.py#L24-L32)
 
 **Section sources**
 - [base.py](file://motrix_envs/src/motrix_envs/base.py#L23-L85)
@@ -139,16 +160,32 @@ class NpEnv {
 }
 class CartPoleEnvCfg
 class AnymalCEnvCfg_loco
-class AnymalCEnvCfg_nav
+class Go1EnvCfg
+class Go2EnvCfg
+class VBotEnvCfg
 class FrankaLiftCubeEnvCfg
 class CartPoleEnv
+class NoiseConfig {
++float level
++float scale_joint_angle
++float scale_joint_vel
++float scale_gyro
++float scale_gravity
++float scale_linvel
+}
 EnvCfg <|-- CartPoleEnvCfg
 EnvCfg <|-- AnymalCEnvCfg_loco
-EnvCfg <|-- AnymalCEnvCfg_nav
+EnvCfg <|-- Go1EnvCfg
+EnvCfg <|-- Go2EnvCfg
+EnvCfg <|-- VBotEnvCfg
 EnvCfg <|-- FrankaLiftCubeEnvCfg
 ABEnv <|-- NpEnv
 ABEnv <|.. CartPoleEnv
 NpEnv <|-- CartPoleEnv
+Go1EnvCfg --> NoiseConfig
+Go2EnvCfg --> NoiseConfig
+AnymalCEnvCfg_loco --> NoiseConfig
+VBotEnvCfg --> NoiseConfig
 ```
 
 **Diagram sources**
@@ -158,6 +195,9 @@ NpEnv <|-- CartPoleEnv
 - [anymal_c_loco_cfg.py](file://motrix_envs/src/motrix_envs/locomotion/anymal_c/cfg.py#L110-L129)
 - [anymal_c_nav_cfg.py](file://motrix_envs/src/motrix_envs/navigation/anymal_c/cfg.py#L95-L116)
 - [franka_lift_cube_cfg.py](file://motrix_envs/src/motrix_envs/manipulation/franka_lift_cube/cfg.py#L69-L84)
+- [go1_loco_cfg.py](file://motrix_envs/src/motrix_envs/locomotion/go1/cfg.py#L23-L31)
+- [go2_loco_cfg.py](file://motrix_envs/src/motrix_envs/locomotion/go2/cfg.py#L25-L33)
+- [vbot_nav_cfg.py](file://motrix_envs/src/motrix_envs/navigation/vbot/cfg.py#L24-L32)
 - [cartpole_np.py](file://motrix_envs/src/motrix_envs/basic/cartpole/cartpole_np.py#L26-L98)
 
 ## Detailed Component Analysis
@@ -271,9 +311,9 @@ Practical override example:
 - [cartpole_cfg.py](file://motrix_envs/src/motrix_envs/basic/cartpole/cfg.py#L25-L32)
 - [cartpole_np.py](file://motrix_envs/src/motrix_envs/basic/cartpole/cartpole_np.py#L26-L98)
 
-#### Locomotion Environments (e.g., Anymal C)
-- AnymalCEnvCfg extends EnvCfg and adds nested configuration groups:
-  - NoiseConfig: noise levels and scales for sensors/joints.
+#### Locomotion Environments (e.g., Anymal C, Go1, Go2)
+- All locomotion environments extend EnvCfg and add nested configuration groups:
+  - **NoiseConfig**: Enhanced noise modeling with configurable scales for joint angles, velocities, gyroscopes, gravity, and linear velocities
   - ControlConfig: action scaling/torque limits.
   - InitState: initial base position, randomization range, and default joint angles.
   - Commands: pose command ranges.
@@ -281,13 +321,24 @@ Practical override example:
   - Asset: body/foot names, termination contacts, ground name.
   - Sensor: base sensor names.
   - RewardConfig: reward scales dictionary.
-- These nested structures enable modular configuration and easy overrides.
+
+**Updated** The NoiseConfig class provides comprehensive noise modeling capabilities with six configurable parameters:
+- level: Overall noise intensity multiplier
+- scale_joint_angle: Noise scale for joint angle measurements
+- scale_joint_vel: Noise scale for joint velocity measurements  
+- scale_gyro: Noise scale for gyroscope readings
+- scale_gravity: Noise scale for gravity vector measurements
+- scale_linvel: Noise scale for linear velocity measurements
+
+These nested structures enable modular configuration and easy overrides.
 
 Validation and defaults:
 - Inherits EnvCfg.validate; defaults for sim_dt, ctrl_dt, and other EnvCfg fields apply unless overridden.
 
 **Section sources**
 - [anymal_c_loco_cfg.py](file://motrix_envs/src/motrix_envs/locomotion/anymal_c/cfg.py#L25-L129)
+- [go1_loco_cfg.py](file://motrix_envs/src/motrix_envs/locomotion/go1/cfg.py#L23-L31)
+- [go2_loco_cfg.py](file://motrix_envs/src/motrix_envs/locomotion/go2/cfg.py#L25-L33)
 
 #### Manipulation Environments (e.g., Franka Lift Cube)
 - FrankaLiftCubeEnvCfg extends EnvCfg and adds:
@@ -300,12 +351,14 @@ Validation and defaults:
 **Section sources**
 - [franka_lift_cube_cfg.py](file://motrix_envs/src/motrix_envs/manipulation/franka_lift_cube/cfg.py#L27-L84)
 
-#### Navigation Environments (e.g., Anymal C Navigation)
-- AnymalCEnvCfg extends EnvCfg with similar nested groups as locomotion but tailored for navigation scenarios.
+#### Navigation Environments (e.g., Anymal C Navigation, VBot)
+- VBotEnvCfg extends EnvCfg with similar nested groups as locomotion but tailored for navigation scenarios.
+- **Updated** VBotSection012EnvCfg now features an initial spawn position of [0.0, 10, 2.0] instead of the previous [0.0, -2.5, 0.5], reflecting the updated spawn point configuration.
 - Includes max_episode_steps as an explicit field, complementing max_episode_seconds.
 
 **Section sources**
 - [anymal_c_nav_cfg.py](file://motrix_envs/src/motrix_envs/navigation/anymal_c/cfg.py#L95-L116)
+- [vbot_nav_cfg.py](file://motrix_envs/src/motrix_envs/navigation/vbot/cfg.py#L492-L553)
 
 ### Serialization, Deserialization, and Persistence
 - Configuration serialization: EnvCfg and nested configuration classes are Python dataclasses. They can be serialized/deserialized using standard libraries such as pickle or JSON-compatible serializers. For JSON, convert nested dataclasses to dictionaries using the dataclasses.asdict helper before encoding.
@@ -313,8 +366,6 @@ Validation and defaults:
 - Persistence: Store configuration dictionaries to files (e.g., YAML/JSON) and load them at runtime. When using the registry factory, pass the loaded dictionary as env_cfg_override to make.
 
 Note: The repository does not include dedicated serialization utilities; the above describes recommended approaches for integrating with existing EnvCfg/dataclass structures.
-
-[No sources needed since this section provides general guidance]
 
 ### Practical Examples
 
@@ -355,11 +406,17 @@ graph LR
 EnvCfg["EnvCfg"] --> NpEnv["NpEnv"]
 EnvCfg --> CartPoleEnvCfg["CartPoleEnvCfg"]
 EnvCfg --> AnymalCEnvCfg_loco["AnymalCEnvCfg_loco"]
-EnvCfg --> AnymalCEnvCfg_nav["AnymalCEnvCfg_nav"]
+EnvCfg --> Go1EnvCfg["Go1EnvCfg"]
+EnvCfg --> Go2EnvCfg["Go2EnvCfg"]
+EnvCfg --> VBotEnvCfg["VBotEnvCfg"]
 EnvCfg --> FrankaLiftCubeEnvCfg["FrankaLiftCubeEnvCfg"]
 Registry["registry.make"] --> EnvCfg
 Registry --> NpEnv
 CartPoleEnv["CartPoleEnv"] --> NpEnv
+NoiseConfig["NoiseConfig"] --> Go1EnvCfg
+NoiseConfig --> Go2EnvCfg
+NoiseConfig --> AnymalCEnvCfg_loco
+NoiseConfig --> VBotEnvCfg
 ```
 
 **Diagram sources**
@@ -370,6 +427,9 @@ CartPoleEnv["CartPoleEnv"] --> NpEnv
 - [anymal_c_loco_cfg.py](file://motrix_envs/src/motrix_envs/locomotion/anymal_c/cfg.py#L110-L129)
 - [anymal_c_nav_cfg.py](file://motrix_envs/src/motrix_envs/navigation/anymal_c/cfg.py#L95-L116)
 - [franka_lift_cube_cfg.py](file://motrix_envs/src/motrix_envs/manipulation/franka_lift_cube/cfg.py#L69-L84)
+- [go1_loco_cfg.py](file://motrix_envs/src/motrix_envs/locomotion/go1/cfg.py#L23-L31)
+- [go2_loco_cfg.py](file://motrix_envs/src/motrix_envs/locomotion/go2/cfg.py#L25-L33)
+- [vbot_nav_cfg.py](file://motrix_envs/src/motrix_envs/navigation/vbot/cfg.py#L24-L32)
 - [cartpole_np.py](file://motrix_envs/src/motrix_envs/basic/cartpole/cartpole_np.py#L26-L98)
 
 **Section sources**
@@ -383,8 +443,6 @@ CartPoleEnv["CartPoleEnv"] --> NpEnv
 - Rendering: render_spacing affects rendering frequency; higher values reduce overhead but decrease visualization fidelity.
 - Vectorization: num_envs influences batch size; larger batches improve throughput but require more memory.
 
-[No sources needed since this section provides general guidance]
-
 ## Troubleshooting Guide
 Common issues and resolutions:
 - Invalid timestep relationship: If sim_dt > ctrl_dt, EnvCfg.validate raises an error. Adjust sim_dt or ctrl_dt accordingly.
@@ -397,11 +455,33 @@ Common issues and resolutions:
 - [registry.py](file://motrix_envs/src/motrix_envs/registry.py#L114-L161)
 
 ## Conclusion
-The MotrixLab-S1 configuration management system leverages a robust EnvCfg dataclass with validation, a registry-driven factory for safe instantiation, and environment-family-specific subclasses with nested configuration groups. This design enables clear defaults, flexible overrides, and strong validation while maintaining simplicity and extensibility across basic, locomotion, manipulation, and navigation domains.
+The MotrixLab-S1 configuration management system leverages a robust EnvCfg dataclass with validation, a registry-driven factory for safe instantiation, and environment-family-specific subclasses with nested configuration groups. **Updated** The system now includes comprehensive noise modeling capabilities through the NoiseConfig class, enabling precise control over sensor noise characteristics across joint angles, velocities, gyroscopes, gravity, and linear velocities. The VBot navigation environments feature updated spawn positions, particularly the VBotSection012 environment with its new initial position configuration. This design enables clear defaults, flexible overrides, and strong validation while maintaining simplicity and extensibility across basic, locomotion, manipulation, and navigation domains.
 
 ## Appendices
 
-### Appendix A: Reward Utilities Used by Some Configurations
+### Appendix A: Noise Modeling Capabilities
+The NoiseConfig class provides comprehensive noise modeling for realistic sensor simulation:
+
+**Noise Parameters:**
+- **level**: Overall noise intensity multiplier (default: 1.0)
+- **scale_joint_angle**: Noise scale for joint angle measurements (default: 0.03)
+- **scale_joint_vel**: Noise scale for joint velocity measurements (default: 1.5)
+- **scale_gyro**: Noise scale for gyroscope readings (default: 0.2)
+- **scale_gravity**: Noise scale for gravity vector measurements (default: 0.05)
+- **scale_linvel**: Noise scale for linear velocity measurements (default: 0.1)
+
+**Usage Examples:**
+- High-fidelity simulation: level=1.0, moderate noise scales
+- Real-world conditions: level=1.5, increased noise scales
+- Sensor calibration: level=0.5, reduced noise for baseline testing
+
+**Section sources**
+- [go1_loco_cfg.py](file://motrix_envs/src/motrix_envs/locomotion/go1/cfg.py#L23-L31)
+- [go2_loco_cfg.py](file://motrix_envs/src/motrix_envs/locomotion/go2/cfg.py#L25-L33)
+- [anymal_c_loco_cfg.py](file://motrix_envs/src/motrix_envs/locomotion/anymal_c/cfg.py#L25-L33)
+- [vbot_nav_cfg.py](file://motrix_envs/src/motrix_envs/navigation/vbot/cfg.py#L24-L32)
+
+### Appendix B: Reward Utilities Used by Some Configurations
 Some configurations rely on reward utilities that implement tolerance functions with configurable sigmoid shapes and margins. These utilities validate inputs and compute smooth penalties or bonuses.
 
 ```mermaid
