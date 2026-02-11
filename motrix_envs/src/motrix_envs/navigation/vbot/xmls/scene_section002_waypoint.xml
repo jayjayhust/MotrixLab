@@ -49,19 +49,34 @@
     <attach model="section03V" prefix="S3V_"/> 
     
     <!-- 路径点定义（用于触发特殊动作） -->
-    <!-- Way_Point_1: Section01区域，坐标约为 (-3.0, 0.0, 0.1) -->
+    <!-- Way_Point_1-1: Section01区域第一排奖励点1，坐标约为 (-3.0, 0.0, 0.1) -->
     <body name="wp_1-1_body" pos="-3.0 0.0 0.1">
       <geom name="wp_1_trigger" type="sphere" size="0.3" rgba="0 1 0 0.5" contype="0" conaffinity="0" group="0"/>
     </body>
 
-    <!-- Way_Point_1-2: Section01区域，坐标约为 (0.0, 0.0, 0.1) -->
+    <!-- Way_Point_1-2: Section01区域第一排奖励点2，坐标约为 (0.0, 0.0, 0.1) -->
     <body name="wp_1-2_body" pos="0.0 0.0 0.1">
       <geom name="wp_1-2_trigger" type="sphere" size="0.3" rgba="0 1 0 0.5" contype="0" conaffinity="0" group="0"/>
     </body>
 
-    <!-- Way_Point_1-3: Section01区域，坐标约为 (3.0, 0.0, 0.1) -->
+    <!-- Way_Point_1-3: Section01区域第一排奖励点3，坐标约为 (3.0, 0.0, 0.1) -->
     <body name="wp_1-3_body" pos="3.0 0.0 0.1">
       <geom name="wp_1-3_trigger" type="sphere" size="0.3" rgba="0 1 0 0.5" contype="0" conaffinity="0" group="0"/>
+    </body>
+
+    <!-- Way_Point_1-5: Section01区域第二排奖励点1，坐标约为 (-3.0, 4.5, 0.6) -->
+    <body name="wp_1-5_body" pos="-3.0 4.5 0.6">
+      <geom name="wp_1-5_trigger" type="sphere" size="0.3" rgba="0 1 0 0.5" contype="0" conaffinity="0" group="0"/>
+    </body>
+
+    <!-- Way_Point_1-6: Section01区域第二排奖励点2，坐标约为 (0.0, 4.5, 0.6) -->
+    <body name="wp_1-6_body" pos="0.0 4.5 0.6">
+      <geom name="wp_1-6_trigger" type="sphere" size="0.3" rgba="0 1 0 0.5" contype="0" conaffinity="0" group="0"/>
+    </body>
+
+    <!-- Way_Point_1-7: Section01区域第二排奖励点3，坐标约为 (3.0, 4.5, 0.6) -->
+    <body name="wp_1-7_body" pos="3.0 4.5 0.6">
+      <geom name="wp_1-7_trigger" type="sphere" size="0.3" rgba="0 1 0 0.5" contype="0" conaffinity="0" group="0"/>
     </body>
 
     <!-- Way_Point_1-4: Section01区域，坐标约为 (0.0, 8.0, 1.3) -->
@@ -109,6 +124,9 @@
     <contact name="wp_1-1_body_contact" subtree1="base" subtree2="wp_1-1_body" data="normal" num="1" />
     <contact name="wp_1-2_body_contact" subtree1="base" subtree2="wp_1-2_body" data="normal" num="1" />
     <contact name="wp_1-3_body_contact" subtree1="base" subtree2="wp_1-3_body" data="normal" num="1" />
+    <contact name="wp_1-5_body_contact" subtree1="base" subtree2="wp_1-5_body" data="normal" num="1" />
+    <contact name="wp_1-6_body_contact" subtree1="base" subtree2="wp_1-6_body" data="normal" num="1" />
+    <contact name="wp_1-7_body_contact" subtree1="base" subtree2="wp_1-7_body" data="normal" num="1" />
     <contact name="wp_1-4_body_contact" subtree1="base" subtree2="wp_1-4_body" data="normal" num="1" />
     <contact name="wp_2-1_body_contact" subtree1="base" subtree2="wp_2-1_body" data="normal" num="1" />
     <contact name="wp_3-1_body_contact" subtree1="base" subtree2="wp_3-1_body" data="normal" num="1" />

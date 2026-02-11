@@ -852,13 +852,27 @@ class VBotSection002WaypointEnv(NpEnv):
         desired_vel_xy = np.clip(position_error * 1.0, -1.0, 1.0)
         desired_vel_xy = np.where(reached_all[:, np.newaxis], 0.0, desired_vel_xy)
         
-        # 角速度命令：跟踪运动方向（从当前位置指向目标）
-        # 与vbot_np保持一致的增益和上限，确保转向足够快
+        # 角速度命令：改进的转向策略
+        # 计算到目标点的方向
         desired_heading = np.arctan2(position_error[:, 1], position_error[:, 0])
         heading_to_movement = desired_heading - robot_heading
         heading_to_movement = np.where(heading_to_movement > np.pi, heading_to_movement - 2*np.pi, heading_to_movement)
         heading_to_movement = np.where(heading_to_movement < -np.pi, heading_to_movement + 2*np.pi, heading_to_movement)
-        desired_yaw_rate = np.clip(heading_to_movement * 1.0, -1.0, 1.0)  # 增益和上限与vbot_np一致
+        
+        # ===== 改进：智能转向控制 =====
+        # 当需要大转向时，优先转向而不是前进
+        large_turn_required = np.abs(heading_to_movement) > np.deg2rad(60)  # 需要大于60度转向
+        
+        # 对于大转向情况，降低前进速度，提高转向速度
+        turn_priority_factor = np.where(large_turn_required, 0.3, 1.0)  # 大转向时前进速度降为30%
+        turn_amplification = np.where(large_turn_required, 1.5, 1.0)    # 大转向时转向增益提高50%
+        
+        # 计算期望速度命令
+        desired_vel_xy = np.clip(position_error * 1.0 * turn_priority_factor[:, np.newaxis], -1.0, 1.0)
+        desired_vel_xy = np.where(reached_all[:, np.newaxis], 0.0, desired_vel_xy)
+        
+        # 转向命令（增强版）
+        desired_yaw_rate = np.clip(heading_to_movement * 1.0 * turn_amplification, -1.5, 1.5)  # 提高转向上限到1.5
         deadband_yaw = np.deg2rad(8)
         desired_yaw_rate = np.where(np.abs(heading_to_movement) < deadband_yaw, 0.0, desired_yaw_rate)
         desired_yaw_rate = np.where(reached_all, 0.0, desired_yaw_rate)
@@ -1260,6 +1274,29 @@ class VBotSection002WaypointEnv(NpEnv):
         forward_alignment = np.cos(movement_direction - robot_heading)  # 与朝向的对齐程度
         forward_alignment_reward = np.clip(forward_alignment, 0, 1)  # 只奖励正面运动
         
+        # ===== 新增：转向准备奖励机制 =====
+        # 鼓励机器人在移动前先调整朝向
+        # 计算到下一目标点的理想朝向
+        next_waypoint_direction = np.arctan2(position_error[:, 1], position_error[:, 0] + 1e-6)
+        heading_to_target = next_waypoint_direction - robot_heading
+        heading_to_target = np.where(heading_to_target > np.pi, heading_to_target - 2*np.pi, heading_to_target)
+        heading_to_target = np.where(heading_to_target < -np.pi, heading_to_target + 2*np.pi, heading_to_target)
+        
+        # 转向准备奖励：当角速度与所需转向方向一致时给予奖励
+        required_turn_direction = np.sign(heading_to_target)  # 所需转向方向 (+1 或 -1)
+        gyro_z_sign = np.sign(gyro[:, 2] + 1e-6)  # 实际转向方向
+        turn_preparation_reward = np.where(
+            np.logical_and(
+                np.abs(heading_to_target) > np.deg2rad(30),  # 需要较大转向时
+                required_turn_direction * gyro_z_sign > 0.5   # 转向方向正确
+            ),
+            np.clip(np.abs(gyro[:, 2]) * 2.0, 0, 1.0),  # 根据角速度大小奖励
+            0.0
+        )
+        
+        # 转向完成奖励：当朝向接近目标方向时给予奖励
+        heading_alignment_reward = np.exp(-np.square(heading_to_target) / (np.pi/6)**2)  # σ=30°
+        
         # ===== 新增：步态节奏奖励 =====
         # 鼓励交替迈步的自然步态
         foot_contact_pattern = np.zeros(self._num_envs, dtype=np.float32)
@@ -1307,6 +1344,30 @@ class VBotSection002WaypointEnv(NpEnv):
         except:
             stair_climbing_state = np.zeros(self._num_envs, dtype=np.float32)
         
+        # ===== 新增： waypoint proximity turning guidance =====
+        # 当接近waypoint时，更强地鼓励转向行为
+        waypoint_proximity_turning = np.zeros(self._num_envs, dtype=np.float32)
+        try:
+            # 检查是否接近waypoint（距离小于1.0米）
+            close_to_waypoint = distance_to_target < 1.0
+            if np.any(close_to_waypoint):
+                # 在接近waypoint时，如果需要大转向，则强烈鼓励原地转向
+                large_turn_required = np.abs(heading_to_target) > np.deg2rad(45)  # 需要大于45度转向
+                should_turn_in_place = np.logical_and(close_to_waypoint, large_turn_required)
+                
+                # 原地转向奖励：低线速度 + 高角速度
+                low_forward_speed = np.linalg.norm(base_lin_vel[:, :2], axis=1) < 0.3  # 前进速度低于0.3m/s
+                high_turning_speed = np.abs(gyro[:, 2]) > 0.8  # 转向角速度高于0.8 rad/s
+                
+                turning_in_place_condition = np.logical_and(
+                    should_turn_in_place,
+                    np.logical_and(low_forward_speed, high_turning_speed)
+                )
+                
+                waypoint_proximity_turning = np.where(turning_in_place_condition, 1.5, 0.0)
+        except:
+            waypoint_proximity_turning = np.zeros(self._num_envs, dtype=np.float32)
+        
         # 2. 下坡状态检测（更敏感）
         slope_angle = slope_features['slope_angle']
         is_downhill = np.logical_and(slope_angle < -np.deg2rad(5), slope_angle > -np.deg2rad(45))
@@ -1331,7 +1392,7 @@ class VBotSection002WaypointEnv(NpEnv):
         # 下坡激励奖励（增强）
         downhill_incentive = downhill_state * 0.8  # 下坡状态下给予更高奖励（0.6→0.8）
         
-        # 综合奖励（楼梯地形优化版 + 步态引导 + 攀爬激励）
+        # 综合奖励（楼梯地形优化版 + 步态引导 + 攀爬激励 + 转向奖励）
         # 到达后：停止所有正向奖励，只保留停止奖励和惩罚项
         reward = np.where(
             reached_all,
@@ -1349,9 +1410,12 @@ class VBotSection002WaypointEnv(NpEnv):
             ),
             # 未到达：正常奖励（平衡激进性与稳定性）
             (
-                0.85 * tracking_lin_vel      # 线速度跟踪（恢复权重）
-                + 0.25 * tracking_ang_vel    # 角速度跟踪（恢复权重）
-                + 1.0 * forward_alignment_reward  # 前进方向奖励
+                0.7 * tracking_lin_vel      # 线速度跟踪（略微降低权重给转向让路）
+                + 0.3 * tracking_ang_vel    # 角速度跟踪（提高权重）
+                + 1.2 * forward_alignment_reward  # 前进方向奖励（提高）
+                + 0.8 * turn_preparation_reward   # 转向准备奖励（新增）
+                + 1.0 * heading_alignment_reward  # 转向完成奖励（新增）
+                + 1.2 * waypoint_proximity_turning # waypoint接近时转向奖励（新增）
                 + 0.4 * foot_contact_pattern      # 步态节奏奖励
                 + approach_reward            # 接近奖励
                 + 0.35 * slope_adaptation_reward # 坡度适应奖励（恢复）
@@ -1419,6 +1483,13 @@ class VBotSection002WaypointEnv(NpEnv):
             print(f"[reward] reward={reward_mean}")
             visited_list = [list(s) for s in self.visited_waypoints[:10]]
             print(f"[waypoint] Visited_waypoints(first 10 envs): {visited_list}")
+            
+            # 转向行为调试信息
+            turn_prep_mean = float(np.mean(turn_preparation_reward))  # 转向准备奖励的平均值
+            heading_align_mean = float(np.mean(heading_alignment_reward))  # 转向完成奖励的平均值
+            waypoint_turn_mean = float(np.mean(waypoint_proximity_turning))  # waypoint接近时转向奖励的平均值
+            large_turn_count = int(large_turn_required.sum())
+            print(f"[turning] turn_prep={turn_prep_mean:.3f} heading_align={heading_align_mean:.3f} wp_turn={waypoint_turn_mean:.3f} large_turn={large_turn_count}/{total_envs}")
         except Exception:
             pass
         return reward

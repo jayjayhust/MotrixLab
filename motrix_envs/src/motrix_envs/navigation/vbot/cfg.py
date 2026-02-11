@@ -772,7 +772,7 @@ class VBotSection002WaypointEnvCfg(VBotStairsEnvCfg):
         ground_subtree_prefixes = ["S1C_", "S2C_", "S3C_"]  # 全地形地面子树前缀
         ground_name = "diban"
         goal_name = ""  # 目标位置名称，注意要加S3V_这个前缀（在scene_section002_waypoint.xml中进行了定义）
-        difficulty_mode = "normal"  # "simple", "easy", "normal", "hard"
+        difficulty_mode = "hard-2"  # "simple", "easy", "normal", "hard-1", "hard-2"
         # 根据difficulty_mode选择不同的路径点配置
         WAYPOINT_CONFIGS = {
             "simple": [  # 最简单,不带奖励点,驻留点不带庆祝动作
@@ -786,20 +786,31 @@ class VBotSection002WaypointEnvCfg(VBotStairsEnvCfg):
                 {"name": "wp_3-1_body", "index": 2, "action": True}
             ],
             "normal": [  # 复杂一点,带3个奖励点,驻留点不带庆祝动作
-                {"name": "wp_1-2_body", "index": 0, "action": False},
-                {"name": "wp_1-1_body", "index": 1, "action": False},
-                {"name": "wp_1-3_body", "index": 2, "action": False},
+                {"name": "wp_1-1_body", "index": 0, "action": False},
+                {"name": "wp_1-3_body", "index": 1, "action": False},
+                {"name": "wp_1-2_body", "index": 2, "action": False},
                 {"name": "wp_1-4_body", "index": 3, "action": False},
                 {"name": "wp_2-1_body", "index": 4, "action": False},
                 {"name": "wp_3-1_body", "index": 5, "action": False}
             ],
-            "hard": [  # 最复杂,带3个奖励点,驻留点全部带庆祝动作
-                {"name": "wp_1-2_body", "index": 0, "action": False},
-                {"name": "wp_1-1_body", "index": 1, "action": False},
-                {"name": "wp_1-3_body", "index": 2, "action": False},
+            "hard-1": [  # 最复杂,带3个奖励点,驻留点全部带庆祝动作
+                {"name": "wp_1-1_body", "index": 0, "action": False},
+                {"name": "wp_1-3_body", "index": 1, "action": False},
+                {"name": "wp_1-2_body", "index": 2, "action": False},
                 {"name": "wp_1-4_body", "index": 3, "action": True},
                 {"name": "wp_2-1_body", "index": 4, "action": True},
                 {"name": "wp_3-1_body", "index": 5, "action": True}
+            ],
+            "hard-2": [  # 最复杂,带6个奖励点,驻留点全部带庆祝动作
+                {"name": "wp_1-1_body", "index": 0, "action": False},
+                {"name": "wp_1-2_body", "index": 1, "action": False},
+                {"name": "wp_1-3_body", "index": 2, "action": False},
+                {"name": "wp_1-7_body", "index": 3, "action": False},
+                {"name": "wp_1-6_body", "index": 4, "action": False},
+                {"name": "wp_1-5_body", "index": 5, "action": False},
+                {"name": "wp_1-4_body", "index": 6, "action": True},
+                {"name": "wp_2-1_body", "index": 7, "action": True},
+                {"name": "wp_3-1_body", "index": 8, "action": True}
             ],
         }
         way_point_names = None  # 由__post_init__根据difficulty_mode自动设置
