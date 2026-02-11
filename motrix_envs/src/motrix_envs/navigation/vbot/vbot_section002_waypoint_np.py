@@ -541,8 +541,8 @@ class VBotSection002WaypointEnv(NpEnv):
                 np.linalg.norm(gravity_projection[:, :2], axis=1),
                 np.abs(gravity_projection[:, 2])
             )
-            # 下坡检测：负坡度且坡度较大
-            is_downhill = np.logical_and(slope_angle < -np.deg2rad(10), slope_angle > -np.deg2rad(45))
+            # 下坡检测：更早识别下坡状态（降低阈值）
+            is_downhill = np.logical_and(slope_angle < -np.deg2rad(5), slope_angle > -np.deg2rad(45))
         except:
             is_downhill = np.zeros(data.shape[0], dtype=bool)
         
@@ -552,10 +552,10 @@ class VBotSection002WaypointEnv(NpEnv):
         kp_rl_rr_normal = 100.0    # 提高后腿增益增强推进力
         kv_normal = 6.0            # 降低阻尼允许更积极的动作
         
-        # 下坡：降低增益提高稳定性，防止蹦跳
-        kp_fl_fr_downhill = 75.0   # 下坡时前腿增益适中
-        kp_rl_rr_downhill = 90.0   # 下坡时后腿增益适中
-        kv_downhill = 7.0          # 下坡时适中阻尼
+        # 下坡：大幅降低增益提高稳定性，防止滑倒
+        kp_fl_fr_downhill = 65.0   # 下坡时前腿增益显著降低（从75→65）
+        kp_rl_rr_downhill = 80.0   # 下坡时后腿增益显著降低（从90→80）
+        kv_downhill = 8.5          # 下坡时增大阻尼（从7→8.5）提供更多阻尼力
         
         # 混合参数
         kp_fl_fr = np.where(is_downhill, kp_fl_fr_downhill, kp_fl_fr_normal)
@@ -1274,29 +1274,29 @@ class VBotSection002WaypointEnv(NpEnv):
         except:
             stair_climbing_state = np.zeros(self._num_envs, dtype=np.float32)
         
-        # 2. 下坡状态检测
+        # 2. 下坡状态检测（更敏感）
         slope_angle = slope_features['slope_angle']
-        is_downhill = np.logical_and(slope_angle < -np.deg2rad(8), slope_angle > -np.deg2rad(45))
+        is_downhill = np.logical_and(slope_angle < -np.deg2rad(5), slope_angle > -np.deg2rad(45))
         downhill_state = is_downhill.astype(np.float32)
         
-        # 3. 下坡稳定性奖励
-        # 下坡时鼓励稳定下降，避免剧烈动作
+        # 3. 下坡稳定性奖励（强化）
+        # 下坡时强烈鼓励稳定下降，严格限制动作幅度
         downhill_stability = np.zeros(self._num_envs, dtype=np.float32)
         if np.any(is_downhill):
-            # 下坡时奖励较小的角速度和适当的前进速度
+            # 下坡时奖励极小的角速度和缓慢的前进速度
             ang_vel_magnitude = np.linalg.norm(gyro[:, :2], axis=1)
             forward_speed = np.linalg.norm(base_lin_vel[:, :2], axis=1)
-            # 下坡稳定性：角速度小 + 适度前进速度
+            # 下坡稳定性：极严格的角速度限制 + 缓慢前进速度
             downhill_stability = np.where(
                 is_downhill,
-                np.exp(-np.square(ang_vel_magnitude) / (0.5**2)) * np.clip(forward_speed / 1.0, 0, 1),
+                np.exp(-np.square(ang_vel_magnitude) / (0.3**2)) * np.clip(forward_speed / 0.8, 0, 1),  # 更严格的角速度阈值(0.5→0.3)和更低速限制(1.0→0.8)
                 0.0
             )
         
         # 楼梯攀登激励奖励
         stair_climb_incentive = stair_climbing_state * 0.8  # 攀爬状态下给予额外奖励
-        # 下坡激励奖励
-        downhill_incentive = downhill_state * 0.6  # 下坡状态下给予适当奖励
+        # 下坡激励奖励（增强）
+        downhill_incentive = downhill_state * 0.8  # 下坡状态下给予更高奖励（0.6→0.8）
         
         # 综合奖励（楼梯地形优化版 + 步态引导 + 攀爬激励）
         # 到达后：停止所有正向奖励，只保留停止奖励和惩罚项
@@ -1329,8 +1329,8 @@ class VBotSection002WaypointEnv(NpEnv):
                 + stair_climb_incentive          # 楼梯攀登激励奖励
                 + downhill_incentive             # 下坡激励奖励
                 + downhill_stability             # 下坡稳定性奖励
-                - 0.15 * lin_vel_z_penalty   # 适度减少Z轴惩罚
-                - 0.015 * ang_vel_xy_penalty # 适度减少XY角速度惩罚
+                - 0.1 * lin_vel_z_penalty    # 进一步减少Z轴惩罚
+                - 0.01 * ang_vel_xy_penalty  # 进一步减少XY角速度惩罚
                 - 0.0 * orientation_penalty
                 - 0.00001 * torque_penalty
                 - 0.0 * dof_vel_penalty
