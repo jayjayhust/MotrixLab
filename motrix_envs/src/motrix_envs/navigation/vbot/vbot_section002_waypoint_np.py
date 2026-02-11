@@ -242,8 +242,40 @@ class VBotSection002WaypointEnv(NpEnv):
             newly_reached = reached & ~already_visited
             
             if np.any(newly_reached):
-                wp_sensor['visited'] = wp_sensor['visited'] | newly_reached
-                reached_waypoints.append({
+                # 检查是否按顺序到达（只有连续的路径点才登记为已访问）
+                ordered_reached = np.zeros(num_envs, dtype=bool)
+                for env_idx in range(num_envs):
+                    if newly_reached[env_idx]:
+                        # 获取当前环境已访问的路径点index
+                        visited_indices = set()
+                        for visited_wp_name in self.visited_waypoints[env_idx]:
+                            for wp in self.way_points:
+                                if wp['name'] == visited_wp_name:
+                                    visited_indices.add(wp['index'])
+                                    break
+                        
+                        # 获取当前路径点的index
+                        current_index = None
+                        for wp in self.way_points:
+                            if wp['name'] == wp_name:
+                                current_index = wp['index']
+                                break
+                        
+                        # 检查是否是下一个预期的路径点（按顺序）
+                        if current_index is not None:
+                            expected_next_index = len(visited_indices)  # 应该是下一个连续的index
+                            if current_index == expected_next_index:
+                                ordered_reached[env_idx] = True
+                                self.visited_waypoints[env_idx].add(wp_name)
+                                wp_sensor['visited'][env_idx] = True
+                                # print(f"[Waypoint] Env {env_idx}: Registered waypoint {wp_name} (index={current_index}) as visited (in order)")
+                            else:
+                                # print(f"[Waypoint] Env {env_idx}: Ignored waypoint {wp_name} (index={current_index}), expected index={expected_next_index}")
+                                pass
+                
+                # 只处理按顺序到达的路径点
+                if np.any(ordered_reached):
+                    reached_waypoints.append({
                     'index': i,
                     'name': wp_name,
                     'requires_action': wp_sensor['requires_action'],
@@ -390,7 +422,9 @@ class VBotSection002WaypointEnv(NpEnv):
         for wp_info in sorted_waypoints:
             # 跳过该env已访问的路径点
             if wp_info['name'] in self.visited_waypoints[env_idx]:
+                # print(f"[DEBUG] Skipping already visited waypoint: {wp_info['name']} (index={wp_info.get('index', 'N/A')})")
                 continue
+            # print(f"[DEBUG] Found next unvisited waypoint: {wp_info['name']} (index={wp_info.get('index', 'N/A')})")
                 
             # 获取该路径点的位置
             try:
@@ -768,9 +802,6 @@ class VBotSection002WaypointEnv(NpEnv):
         # 如果到达了需要特殊动作的路径点，触发特殊动作
         for wp in reached_waypoints:
             env_mask = wp['env_mask']
-            for env_idx in range(num_envs):
-                if env_mask[env_idx]:
-                    self.visited_waypoints[env_idx].add(wp['name'])
             if wp['requires_action']:
                 # print(f"[Waypoint] Special action triggered at {wp['name']}")
                 # 触发非阻塞特殊动作序列（仅对到达该路径点的环境）
@@ -1108,13 +1139,13 @@ class VBotSection002WaypointEnv(NpEnv):
         tracking_ang_vel = np.exp(-ang_vel_error / 0.25)
         
         # 1. 坡度自适应奖励
-        slope_angle = slope_features['slope_angle']
+        slope_angle = slope_features['slope_angle']  # 1 radians=57.2958 degrees
         # 打印前10条数据，如果条数小于10，打印全部
         if hasattr(slope_angle, '__len__'):
             display_data = slope_angle[:10] if len(slope_angle) > 10 else slope_angle
-            print(f"[slope_angle] (first 10): {display_data}")
+            print(f"[slope_angle(in radians)] (first 10): {[f'{x:.2f}' for x in display_data]}")
         else:
-            print(f"[slope_angle]: {slope_angle}")
+            print(f"[slope_angle(in radians)]: {slope_angle:.2f}")
         # 坡度适中时给予奖励（鼓励稳定的爬坡姿态）
         slope_adaptation_reward = np.exp(-np.square(slope_angle) / (np.pi/8)**2)  # σ=22.5°
         
@@ -1145,16 +1176,18 @@ class VBotSection002WaypointEnv(NpEnv):
             display_target = target_position[:10] if len(target_position) > 10 else target_position
             display_robot = robot_position[:10] if len(robot_position) > 10 else robot_position
             # print(f"[reached_position] reached_position (first 10)={display_reached}")
-            print(f"[reached_position] distance_to_target (first 10)={[f'{x:.5f}' for x in display_distance]}")
+            print(f"[reached_position] distance_to_target (first 10)={[f'{x:.4f}' for x in display_distance]}")
             target_formatted = [f'[{float(row[0]):.2f}, {float(row[1]):.2f}]' for row in display_target]
             print(f"[reached_position] target_position (first 10)={', '.join(target_formatted)}")
-            # print(f"[reached_position] robot_position (first 10)={display_robot}")
+            robot_formatted = [f'[{float(row[0]):.2f}, {float(row[1]):.2f}]' for row in display_robot]
+            print(f"[reached_position] robot_position  (first 10)={', '.join(robot_formatted)}")
         else:
             # print(f"[reached_position] reached_position={reached_position}")
-            print(f"[reached_position] distance_to_target={[f'{x:.5f}' for x in display_distance]}")
+            print(f"[reached_position] distance_to_target={[f'{x:.4f}' for x in display_distance]}")
             target_formatted = [f'[{float(row[0]):.2f}, {float(row[1]):.2f}]' for row in display_target]
             print(f"[reached_position] target_position={', '.join(target_formatted)}")
-            # print(f"[reached_position] robot_position={robot_position}")
+            robot_formatted = [f'[{float(row[0]):.2f}, {float(row[1]):.2f}]' for row in display_robot]
+            print(f"[reached_position]  robot_position={', '.join(robot_formatted)}")
             pass
         
         heading_threshold = np.deg2rad(15)

@@ -771,8 +771,8 @@ class VBotSection002WaypointEnvCfg(VBotStairsEnvCfg):
         # 支持多个地面子树前缀的列表，用于全地形接触检测
         ground_subtree_prefixes = ["S1C_", "S2C_", "S3C_"]  # 全地形地面子树前缀
         ground_name = "diban"
-        goal_name = "S3V_End_Point_3"  # 目标位置名称，注意要加S3V_这个前缀（在scene_section002_waypoint.xml中进行了定义）
-        difficulty_mode = "easy"  # "simple", "easy", "normal", "hard"
+        goal_name = ""  # 目标位置名称，注意要加S3V_这个前缀（在scene_section002_waypoint.xml中进行了定义）
+        difficulty_mode = "normal"  # "simple", "easy", "normal", "hard"
         # 根据difficulty_mode选择不同的路径点配置
         WAYPOINT_CONFIGS = {
             "simple": [  # 最简单,不带奖励点,驻留点不带庆祝动作
