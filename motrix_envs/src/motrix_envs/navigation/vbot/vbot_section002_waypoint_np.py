@@ -587,12 +587,12 @@ class VBotSection002WaypointEnv(NpEnv):
         
         # 分别计算前腿和后腿的力矩
         torques = np.zeros_like(pos_error)
-        # 前腿 (FL, FR): 索引 0-2, 3-5
-        torques[:, 0:3] = kp_fl_fr[:, np.newaxis] * pos_error[:, 0:3] - kv[:, np.newaxis] * current_vel[:, 0:3]  # FL
-        torques[:, 3:6] = kp_fl_fr[:, np.newaxis] * pos_error[:, 3:6] - kv[:, np.newaxis] * current_vel[:, 3:6]  # FR
-        # 后腿 (RL, RR): 索引 6-8, 9-11
-        torques[:, 6:9] = kp_rl_rr[:, np.newaxis] * pos_error[:, 6:9] - kv[:, np.newaxis] * current_vel[:, 6:9]   # RL
-        torques[:, 9:12] = kp_rl_rr[:, np.newaxis] * pos_error[:, 9:12] - kv[:, np.newaxis] * current_vel[:, 9:12] # RR
+        # 前腿 (FR, FL): 索引 0-2, 3-5
+        torques[:, 0:3] = kp_fl_fr[:, np.newaxis] * pos_error[:, 0:3] - kv[:, np.newaxis] * current_vel[:, 0:3]  # FR
+        torques[:, 3:6] = kp_fl_fr[:, np.newaxis] * pos_error[:, 3:6] - kv[:, np.newaxis] * current_vel[:, 3:6]  # FL
+        # 后腿 (RR, RL): 索引 6-8, 9-11
+        torques[:, 6:9] = kp_rl_rr[:, np.newaxis] * pos_error[:, 6:9] - kv[:, np.newaxis] * current_vel[:, 6:9]   # RR
+        torques[:, 9:12] = kp_rl_rr[:, np.newaxis] * pos_error[:, 9:12] - kv[:, np.newaxis] * current_vel[:, 9:12] # RL
         
         # 限制力矩范围（与XML中的forcerange一致）
         # hip/thigh: ±17 N·m, calf: ±34 N·m
@@ -1286,17 +1286,33 @@ class VBotSection002WaypointEnv(NpEnv):
         # ===== 新增：步态节奏奖励 =====
         # 鼓励交替迈步的自然步态
         foot_contact_pattern = np.zeros(self._num_envs, dtype=np.float32)
+        gait_symmetry_penalty = np.zeros(self._num_envs, dtype=np.float32)  # 步态对称性惩罚
         try:
             # 简化的步态节奏检测：基于足端Z坐标变化
+            foot_heights = {}  # 存储各足端高度用于对称性检测
             for i, foot_name in enumerate(['FR', 'FL', 'RR', 'RL']):
                 foot_pos_sensor = f'{foot_name}_foot_pos'
                 foot_pos = self._model.get_sensor_value(foot_pos_sensor, data)
                 # 检测足端离地高度
                 foot_height = foot_pos[:, 2]
+                foot_heights[foot_name] = foot_height
                 # 简单的步态节奏奖励：鼓励足端有一定抬升
                 foot_contact_pattern += np.clip((foot_height - 0.05) * 2.0, 0, 1)
+            
+            # ===== 新增：步态对称性惩罚 =====
+            # 四足动物自然步态中，对角腿成对运动（trot gait）
+            # 对角线对1：FL + RR 同步
+            diagonal1_asymmetry = np.abs(foot_heights['FL'] - foot_heights['RR'])
+            # 对角线对2：FR + RL 同步
+            diagonal2_asymmetry = np.abs(foot_heights['FR'] - foot_heights['RL'])
+            # 总对称性惩罚：当对角腿高度差>0.03m时开始惩罚
+            gait_symmetry_penalty = (
+                np.clip((diagonal1_asymmetry - 0.03) * 5.0, 0, 1) + 
+                np.clip((diagonal2_asymmetry - 0.03) * 5.0, 0, 1)
+            )
         except:
             foot_contact_pattern = np.zeros(self._num_envs, dtype=np.float32)
+            gait_symmetry_penalty = np.zeros(self._num_envs, dtype=np.float32)
         
         # ===== 改进：楼梯攀登专用奖励 =====
         # 垂直运动奖励：鼓励合理的上升下降
@@ -1392,6 +1408,7 @@ class VBotSection002WaypointEnv(NpEnv):
                 - 0.00001 * torque_penalty
                 - 0.0 * dof_vel_penalty
                 - 0.0002 * action_rate_penalty  # 进一步减少动作变化惩罚
+                - 0.3 * gait_symmetry_penalty   # 到达后也维持步态对称性
                 + termination_penalty
             ),
             # 未到达：正常奖励（平衡激进性与稳定性）
@@ -1418,6 +1435,7 @@ class VBotSection002WaypointEnv(NpEnv):
                 - 0.00001 * torque_penalty
                 - 0.0 * dof_vel_penalty
                 - 0.00008 * action_rate_penalty  # 适度减少动作变化惩罚
+                - 0.5 * gait_symmetry_penalty    # 步态对称性惩罚，防止单腿持续抬起
                 + termination_penalty
             )
         )
