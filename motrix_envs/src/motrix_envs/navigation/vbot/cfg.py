@@ -754,12 +754,13 @@ class VBotSection002EnvCfg(VBotStairsEnvCfg):
 class VBotSection002WaypointEnvCfg(VBotStairsEnvCfg):
     """VBot Section002全地形训练配置"""
     model_file: str = os.path.dirname(__file__) + "/xmls/scene_section002_waypoint.xml"
-    max_episode_seconds: float = 60.0  # 拉长：从20秒增加到60秒
-    max_episode_steps: int = 6000  # 拉长：从2000步增加到6000步（本回合步数到达后会重新开始训练）
+    max_episode_seconds: float = 60.0  # 拉长：从20秒增加到60秒(训练60.0, 测试80.0)
+    max_episode_steps: int = 6000  # 拉长：从2000步增加到6000步（本回合步数到达后会重新开始训练）(训练6000, 测试8000)
     sim_dt: float = 0.01    # 仿真步长 10ms = 100Hz
     ctrl_dt: float = 0.01
     reset_yaw_scale: float = 0.1
     max_dof_vel: float = 100.0  # 最大关节速度阈值，训练初期给予更大容忍度
+    waypoint_reach_distance: float = 0.1
     
     @dataclass
     class Asset:
@@ -772,7 +773,7 @@ class VBotSection002WaypointEnvCfg(VBotStairsEnvCfg):
         ground_subtree_prefixes = ["S1C_", "S2C_", "S3C_"]  # 全地形地面子树前缀
         ground_name = "diban"
         goal_name = ""  # 目标位置名称，注意要加S3V_这个前缀（在scene_section002_waypoint.xml中进行了定义）
-        difficulty_mode = "hard-2"  # "simple", "easy", "normal", "hard-1", "hard-2"
+        difficulty_mode = "hard-3"  # "simple", "easy", "normal", "hard-1", "hard-2", "hard-3"
         # 根据difficulty_mode选择不同的路径点配置
         WAYPOINT_CONFIGS = {
             "simple": [  # 最简单,不带奖励点,驻留点不带庆祝动作
@@ -793,7 +794,7 @@ class VBotSection002WaypointEnvCfg(VBotStairsEnvCfg):
                 {"name": "wp_2-1_body", "index": 4, "action": False},
                 {"name": "wp_3-1_body", "index": 5, "action": False}
             ],
-            "hard-1": [  # 最复杂,带3个奖励点,驻留点全部带庆祝动作
+            "hard-1": [  # 复杂,带3个奖励点,驻留点全部带庆祝动作
                 {"name": "wp_1-1_body", "index": 0, "action": False},
                 {"name": "wp_1-3_body", "index": 1, "action": False},
                 {"name": "wp_1-2_body", "index": 2, "action": False},
@@ -801,7 +802,18 @@ class VBotSection002WaypointEnvCfg(VBotStairsEnvCfg):
                 {"name": "wp_2-1_body", "index": 4, "action": True},
                 {"name": "wp_3-1_body", "index": 5, "action": True}
             ],
-            "hard-2": [  # 最复杂,带6个奖励点,驻留点全部带庆祝动作
+            "hard-2": [  # 复杂,带6个奖励点,驻留点不带庆祝动作
+                {"name": "wp_1-1_body", "index": 0, "action": False},
+                {"name": "wp_1-2_body", "index": 1, "action": False},
+                {"name": "wp_1-3_body", "index": 2, "action": False},
+                {"name": "wp_1-7_body", "index": 3, "action": False},
+                {"name": "wp_1-6_body", "index": 4, "action": False},
+                {"name": "wp_1-5_body", "index": 5, "action": False},
+                {"name": "wp_1-4_body", "index": 6, "action": False},
+                {"name": "wp_2-1_body", "index": 7, "action": False},
+                {"name": "wp_3-1_body", "index": 8, "action": False}
+            ],
+            "hard-3": [  # 最复杂,带6个奖励点,驻留点全部带庆祝动作
                 {"name": "wp_1-1_body", "index": 0, "action": False},
                 {"name": "wp_1-2_body", "index": 1, "action": False},
                 {"name": "wp_1-3_body", "index": 2, "action": False},

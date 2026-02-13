@@ -152,13 +152,13 @@ class VBotSection002WaypointEnv(NpEnv):
         # 初始化路径点接触检测
         self._init_waypoint_contact_detection()
         
-        # --- Non-blocking special action state (per-env) ---
+        # --- Brief visible celebration action state (per-env) ---
         num_actuators = self._model.num_actuators
-        self._special_action_active = np.zeros(self._num_envs, dtype=bool)
-        self._special_action_step = np.zeros(self._num_envs, dtype=np.int32)
-        self._special_action_duration = np.zeros(self._num_envs, dtype=np.int32)
-        self._special_action_start_pos = np.zeros((self._num_envs, num_actuators), dtype=np.float32)
-        self._special_action_target_pos = np.zeros((self._num_envs, num_actuators), dtype=np.float32)
+        self._celebration_active = np.zeros(self._num_envs, dtype=bool)
+        self._celebration_step = np.zeros(self._num_envs, dtype=np.int32)
+        self._celebration_duration = 60  # About 1 second at 60Hz
+        self._celebration_target_pos = np.zeros((self._num_envs, num_actuators), dtype=np.float32)
+        self._celebration_start_pos = np.zeros((self._num_envs, num_actuators), dtype=np.float32)
 
         print(f"[Waypoint] Initialized {len(self.way_points)} waypoints (sorted by index)")
         for i, wp in enumerate(self.way_points):
@@ -279,108 +279,95 @@ class VBotSection002WaypointEnv(NpEnv):
                     'index': i,
                     'name': wp_name,
                     'requires_action': wp_sensor['requires_action'],
-                    'env_mask': newly_reached,
+                    'env_mask': ordered_reached.copy(),
                 })
         
         return reached_waypoints
     
-    # ===== Special action angle definitions =====
-    _VICTORY_POSE_ANGLES = {
-        # Front legs: moderate raise with knee bend to keep CoM over rear support
-        "FR_hip_joint": -0.2, "FR_thigh_joint": 1.3, "FR_calf_joint": -1.0,
-        "FL_hip_joint": 0.2,  "FL_thigh_joint": 1.3, "FL_calf_joint": -1.0,
-        # Rear legs: crouched wider stance for a stable base
-        "RR_hip_joint": -0.1, "RR_thigh_joint": 0.6, "RR_calf_joint": -1.5,
-        "RL_hip_joint": 0.1,  "RL_thigh_joint": 0.6, "RL_calf_joint": -1.5,
+    # ===== Waypoints that trigger brief celebration =====
+    _CELEBRATION_WAYPOINTS = {"wp_1-4_body", "wp_2-1_body", "wp_3-1_body"}
+    
+    # Celebration pose: front legs raised, rear legs crouched for stability
+    _CELEBRATION_POSE = {
+        # Front legs: raise up with bent knees
+        "FR_hip_joint": -0.1, "FR_thigh_joint": 0.3, "FR_calf_joint": -0.8,
+        "FL_hip_joint": 0.1,  "FL_thigh_joint": 0.3, "FL_calf_joint": -0.8,
+        # Rear legs: crouch for stability
+        "RR_hip_joint": -0.1, "RR_thigh_joint": 1.2, "RR_calf_joint": -2.0,
+        "RL_hip_joint": 0.1,  "RL_thigh_joint": 1.2, "RL_calf_joint": -2.0,
     }
-    _CROUCH_ANGLES = {
-        "FR_hip_joint": 0.0, "FR_thigh_joint": 1.5, "FR_calf_joint": -2.8,
-        "FL_hip_joint": 0.0, "FL_thigh_joint": 1.5, "FL_calf_joint": -2.8,
-        "RR_hip_joint": 0.0, "RR_thigh_joint": 1.2, "RR_calf_joint": -2.2,
-        "RL_hip_joint": 0.0, "RL_thigh_joint": 1.2, "RL_calf_joint": -2.2,
-    }
-    # Mapping: waypoint name -> (target_angles_dict, duration_steps)
-    _SPECIAL_ACTION_MAP = {
-        "wp_1-4_body": (_VICTORY_POSE_ANGLES, 150),
-        "wp_2-1_body": (_VICTORY_POSE_ANGLES, 150),
-        "wp_3-1_body": (_VICTORY_POSE_ANGLES, 150),
-    }
-    _DEFAULT_SPECIAL_ACTION = (_CROUCH_ANGLES, 50)
 
-    def _trigger_special_action_sequence(self, data: mtx.SceneData, waypoint_name: str, env_mask: np.ndarray):
-        """Initialize a non-blocking special action for the environments indicated by *env_mask*.
-
-        Instead of running a blocking loop, this records the target joint
-        positions so that `apply_action` can smoothly interpolate towards them
-        over subsequent simulation steps.
-        """
+    def _trigger_celebration(self, waypoint_name: str, env_mask: np.ndarray):
+        """Trigger a brief visible celebration with front leg raise."""
         if not np.any(env_mask):
             return
-
-        angles_dict, duration = self._SPECIAL_ACTION_MAP.get(
-            waypoint_name, self._DEFAULT_SPECIAL_ACTION
-        )
-        # print(f"[SpecialAction] Starting non-blocking action at {waypoint_name} "
-        #       f"for {int(env_mask.sum())} envs, duration={duration}")
-
-        current_joint_pos = self.get_dof_pos(data)  # [num_envs, num_actuators]
-        target_joint_pos = current_joint_pos.copy()
-
+        
+        # Only trigger celebration for designated waypoints
+        if waypoint_name not in self._CELEBRATION_WAYPOINTS:
+            return
+        
+        # Get current joint positions as start
+        current_pos = self.get_dof_pos(self._state.data)
+        self._celebration_start_pos[env_mask] = current_pos[env_mask]
+        
+        # Build target pose
+        target_pos = current_pos.copy()
         for i in range(self._model.num_actuators):
-            for joint_name, target_angle in angles_dict.items():
+            for joint_name, angle in self._CELEBRATION_POSE.items():
                 if joint_name in self._model.actuator_names[i]:
-                    target_joint_pos[env_mask, i] = target_angle
+                    target_pos[env_mask, i] = angle
                     break
+        self._celebration_target_pos[env_mask] = target_pos[env_mask]
+        
+        self._celebration_active[env_mask] = True
+        self._celebration_step[env_mask] = 0
+        print(f"[Celebration] Front leg raise at {waypoint_name} for {int(env_mask.sum())} envs")
 
-        self._special_action_active[env_mask] = True
-        self._special_action_step[env_mask] = 0
-        self._special_action_duration[env_mask] = duration
-        self._special_action_start_pos[env_mask] = current_joint_pos[env_mask]
-        self._special_action_target_pos[env_mask] = target_joint_pos[env_mask]
-
-    def _get_special_action_override(self) -> tuple[np.ndarray, np.ndarray]:
-        """Return (override_actions, active_mask) for environments running a special action.
-
-        The returned actions are in the same space as the RL agent output
-        (i.e. normalised offsets that `_compute_torques` expects).
+    def _get_celebration_override(self) -> tuple[np.ndarray | None, np.ndarray]:
+        """Return (override_actions, active_mask) for celebration animation.
+        
+        Uses smooth interpolation: raise up in first half, return in second half.
         """
-        active = self._special_action_active.copy()  # bool [num_envs], copy to avoid mutation
-        if not np.any(active):
-            return None, active
-
-        # Advance step counter
-        self._special_action_step[active] += 1
-
-        # Interpolation factor per env
-        alpha = np.clip(
-            self._special_action_step[active].astype(np.float32)
-            / np.maximum(self._special_action_duration[active].astype(np.float32), 1.0),
-            0.0, 1.0,
-        )
-
-        # Interpolated absolute target positions [active_count, num_actuators]
-        interp_pos = (
-            self._special_action_start_pos[active]
-            + alpha[:, np.newaxis] * (self._special_action_target_pos[active] - self._special_action_start_pos[active])
-        )
-
-        # Convert absolute joint targets to normalised RL actions:
-        #   target_pos = default_angles + actions * action_scale
-        #   => actions = (target_pos - default_angles) / action_scale
+        if not np.any(self._celebration_active):
+            return None, self._celebration_active
+        
+        active = self._celebration_active.copy()
+        num_envs = len(active)
+        override_actions = np.zeros((num_envs, self._model.num_actuators), dtype=np.float32)
         action_scale = self._cfg.control_config.action_scale
-        override_actions = (interp_pos - self.default_angles) / action_scale
-        # Clip to valid action range [-1, 1]
-        override_actions = np.clip(override_actions, -1.0, 1.0)
-
-        # Mark completed actions
-        done = self._special_action_step >= self._special_action_duration
-        newly_done = active & done
-        if np.any(newly_done):
-            # print(f"[SpecialAction] Completed for {int(newly_done.sum())} envs")
-            self._special_action_active[newly_done] = False
-            self._special_action_step[newly_done] = 0
-
-        return override_actions, active
+        
+        # Advance step counter
+        self._celebration_step[active] += 1
+        
+        # Calculate interpolation: 0->1 in first half (raise), 1->0 in second half (return)
+        half_duration = self._celebration_duration // 2
+        step = self._celebration_step[active]
+        
+        # Alpha goes 0->1->0 (raise then lower)
+        alpha = np.where(
+            step <= half_duration,
+            step / half_duration,  # Rising phase
+            2.0 - step / half_duration  # Falling phase
+        )
+        alpha = np.clip(alpha, 0.0, 1.0)
+        
+        # Interpolate between start and target pose
+        interp_pos = (
+            self._celebration_start_pos[active] +
+            alpha[:, np.newaxis] * (self._celebration_target_pos[active] - self._celebration_start_pos[active])
+        )
+        
+        # Convert to normalized RL actions
+        celebration_actions = (interp_pos - self.default_angles) / action_scale
+        override_actions[active] = np.clip(celebration_actions, -1.0, 1.0)
+        
+        # Check completion
+        done = self._celebration_step >= self._celebration_duration
+        if np.any(done):
+            self._celebration_active[done] = False
+            self._celebration_step[done] = 0
+        
+        return override_actions[active], active
     
     def _get_first_waypoint_pos(self, data: mtx.SceneData) -> np.ndarray:
         """获取第一个路径点的坐标位置"""
@@ -547,8 +534,8 @@ class VBotSection002WaypointEnv(NpEnv):
                 (1.0 - self.action_filter_alpha) * state.info["filtered_actions"]
             )
         
-        # Override RL actions for envs with an active special action
-        override_actions, active_mask = self._get_special_action_override()
+        # Override RL actions during celebration animation
+        override_actions, active_mask = self._get_celebration_override()
         if override_actions is not None and np.any(active_mask):
             state.info["filtered_actions"][active_mask] = override_actions
         
@@ -799,13 +786,12 @@ class VBotSection002WaypointEnv(NpEnv):
         # 检查是否到达路径点
         reached_waypoints = self._check_waypoint_reached(data, root_pos)
         
-        # 如果到达了需要特殊动作的路径点，触发特殊动作
+        # 如果到达了需要特殊动作的路径点，触发庆祝（仅作标记，不影响RL控制）
         for wp in reached_waypoints:
             env_mask = wp['env_mask']
             if wp['requires_action']:
-                # print(f"[Waypoint] Special action triggered at {wp['name']}")
-                # 触发非阻塞特殊动作序列（仅对到达该路径点的环境）
-                self._trigger_special_action_sequence(data, wp['name'], wp['env_mask'])
+                # 触发简化的庆祝（不影响RL控制）
+                self._trigger_celebration(wp['name'], wp['env_mask'])
                 
         # 如果到达了路径点，per-env更新目标位置
         if len(reached_waypoints) > 0:
@@ -1181,7 +1167,7 @@ class VBotSection002WaypointEnv(NpEnv):
         heading_diff = np.where(heading_diff > np.pi, heading_diff - 2*np.pi, heading_diff)
         heading_diff = np.where(heading_diff < -np.pi, heading_diff + 2*np.pi, heading_diff)
         
-        position_threshold = 0.3  # 与目标位置的误差阈值
+        position_threshold = self._cfg.waypoint_reach_distance  # 与目标位置的误差阈值(要小于途径点标识物的尺寸)
         reached_position = distance_to_target < position_threshold
         # 只打印前10条数据，如果条数小于10，打印全部
         if hasattr(reached_position, '__len__') and hasattr(distance_to_target, '__len__'):
@@ -1241,13 +1227,13 @@ class VBotSection002WaypointEnv(NpEnv):
         zero_ang_bonus = np.where(np.logical_and(reached_all, zero_ang_mask), 6.0, 0.0)  # 到达后：零角速度 bonus
         # 防止指数溢出：限制指数参数的最大值
         speed_xy_calc = np.clip((speed_xy / 0.2)**2, 0, 100)  # 限制最小值为0，最大值为100
-        print("speed_xy 统计信息:")
-        print(f"  最小值: {np.min(speed_xy)}")
-        print(f"  最大值: {np.max(speed_xy)}")
+        # print("speed_xy 统计信息:")
+        # print(f"  最小值: {np.min(speed_xy)}")
+        # print(f"  最大值: {np.max(speed_xy)}")
         gyro_z_calc = np.clip((np.abs(gyro_z_clipped) / 0.1)**4, 0, 100)  # 限制最小值为0，最大值为100
-        print("gyro[:, 2] 统计信息:")
-        print(f"  最小值: {np.min(gyro[:, 2])}")
-        print(f"  最大值: {np.max(gyro[:, 2])}")
+        # print("gyro[:, 2] 统计信息:")
+        # print(f"  最小值: {np.min(gyro[:, 2])}")
+        # print(f"  最大值: {np.max(gyro[:, 2])}")
         stop_base = 2 * (0.8 * np.exp(-speed_xy_calc) + 1.2 * np.exp(-gyro_z_calc))  # 到达后：停止奖励基础
         stop_bonus = np.where(reached_all, stop_base + zero_ang_bonus, 0.0)  # 到达后：停止奖励（包含停止奖励基础+零角速度 bonus）
         
@@ -1478,11 +1464,14 @@ class VBotSection002WaypointEnv(NpEnv):
             print(f"[reward_debug] arrival={arrival_count}/{total_envs} stop={stop_count}/{total_envs} zero_ang={zero_ang_count}/{total_envs}")
             print(f"[position] reached_pos={reached_pos_count}/{total_envs} dist_mean={dist_mean:.2f} m")
             print(f"[heading] reached_head={reached_head_count}/{total_envs} heading_err_mean={heading_err_mean:.1f}°")
+            print(f"[reachAll] reached_all={int(reached_all.sum())}/{total_envs}")
             print(f"[velocity] gyro_z_mean={gyro_z_mean:.4f} rad/s vert_vel={vert_vel_mean:.3f} m/s")
             print(f"[stairs] slope_angle={slope_angle_deg:.1f}° edge_dist={edge_dist_mean:.3f}m dyn_stab={dyn_stab_mean:.3f}")
             print(f"[reward] reward={reward_mean}")
             visited_list = [list(s) for s in self.visited_waypoints[:10]]
+            visited_list_count = [len(s) for s in self.visited_waypoints[:10]]
             print(f"[waypoint] Visited_waypoints(first 10 envs): {visited_list}")
+            print(f"[waypoint] Visited_waypoints_count(first 10 envs): {visited_list_count}")
             
             # 转向行为调试信息
             turn_prep_mean = float(np.mean(turn_preparation_reward))  # 转向准备奖励的平均值
@@ -1511,9 +1500,9 @@ class VBotSection002WaypointEnv(NpEnv):
         # Reset contact sensor visited state for done envs only
         for wp_sensor in self.waypoint_contact_sensors:
             wp_sensor['visited'][done_indices] = False
-        # Reset special action state for done envs only
-        self._special_action_active[done_indices] = False
-        self._special_action_step[done_indices] = 0
+        # Reset celebration state for done envs only
+        self._celebration_active[done_indices] = False
+        self._celebration_step[done_indices] = 0
 
         # Call parent to handle standard reset (obs, info, physics)
         super()._reset_done_envs()
@@ -1523,12 +1512,16 @@ class VBotSection002WaypointEnv(NpEnv):
         num_envs = data.shape[0]
         
         # 在高台中央小范围内随机生成位置
-        # X, Y: 在spawn_center周围 ±spawn_range 范围内随机
+        # 方法1(用于训练):X, Y: 在spawn_center周围 ±spawn_range 范围内随机
         random_xy = np.random.uniform(
             low=-self.spawn_range,
             high=self.spawn_range,
             size=(num_envs, 2)
         )
+        # 方法2(用于测试):X: -2.5~2.5, Y: -0.5~0.5
+        # random_x = np.random.uniform(low=-2.5, high=2.5, size=(num_envs, 1))
+        # random_y = np.random.uniform(low=-0.5, high=0.5, size=(num_envs, 1))
+        # random_xy = np.hstack([random_x, random_y])
         robot_init_xy = self.spawn_center[:2] + random_xy  # [num_envs, 2]
         terrain_heights = np.full(num_envs, self.spawn_center[2], dtype=np.float32)  # 使用配置的高度
         
