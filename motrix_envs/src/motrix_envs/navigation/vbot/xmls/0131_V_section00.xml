@@ -86,7 +86,7 @@
       <geom class="visual" mesh="V_BAKE_OUTSIDE_A" pos="0.0 0.0 0.0" quat="1.0 0.0 0.0 0.0" material="MI_BAKE_OUTSIDE_A"/>
       <geom class="visual" mesh="V_BAKE_OUTSIDE_B" pos="0.0 0.0 0.0" quat="1.0 0.0 0.0 0.0" material="MI_BAKE_OUTSIDE_B"/>
       <geom class="visual" mesh="V_END_light" pos="0.0 0.0 0.0" quat="1.0 0.0 0.0 0.0" material="bluelight"/>
-      <geom name="End_Point" class="visual" mesh="V_ENDPOINT" pos="0.0 0.0 0.0" quat="1.0 0.0 0.0 0.0" material="MI_ENDPOINT"/>
+      <geom class="visual" mesh="V_ENDPOINT" pos="0.0 0.0 0.0" quat="1.0 0.0 0.0 0.0" material="MI_ENDPOINT"/>
       <geom class="visual" mesh="V_ENDPOINT_LIGHT" pos="0.0 0.0 0.0" quat="1.0 0.0 0.0 0.0" material="bluelight.001"/>
       <geom class="visual" mesh="V_LANTERN_BODY_BK" pos="-9.5367431640625e-07 -2.384185791015625e-07 2.134159564971924" quat="1.0 0.0 0.0 0.0" material="MI_LANTERN_BODY_BK"/>
       <geom class="visual" mesh="V_LANTERN_CLOUR_BK" pos="-9.5367431640625e-07 -2.384185791015625e-07 2.6220006942749023" quat="1.0 0.0 0.0 0.0" material="MI_LANTERN_CLOUR_BK"/>

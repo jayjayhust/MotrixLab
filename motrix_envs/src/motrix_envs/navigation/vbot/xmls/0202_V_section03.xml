@@ -26,13 +26,6 @@
       <layer texture="chinese_knot_BK_Bake1_CyclesBake_COMBINED" role="rgb"/>
     </material>
     <material name="MI_white_light" rgba="1.0 1.0 1.0 1.0" emission="1.0 1.0 1.0 1.0" emissionintensity="5.0"/>
-    <material name="MI_ENDPOINT" rgba="1 1 1 1" reflectance="0.5" metallic="0.0" roughness="0.20000000298023224">
-      <layer texture="ENDPOINT_Bake1_CyclesBake_COMBINED" role="rgb"/>
-    </material>
-    <material name="MI_LANTERN_BODY_BK" rgba="1 1 1 1" emission="0.5 0.5 0.5 1.0" emissionintensity="0.2">
-      <layer texture="LANTERN_BODY_BK_Bake1_CyclesBake_COMBINED" role="rgb"/>
-      <layer texture="LANTERN_EMMI" role="emissive"/>
-    </material>
 
     <!-- Visual meshes -->
     <mesh class="visual" name="V_S3_BEGIN_BK" file="V_S3_BEGIN_BK.obj"/>
@@ -43,8 +36,6 @@
     <mesh class="visual" name="V_Section_3_terrainB_LIGHT" file="V_Section_3_terrainB_LIGHT.obj"/>
     <mesh class="visual" name="V_chinese_knot_BK" file="V_chinese_knot_BK.obj"/>
     <mesh class="visual" name="V_chinese_knot_LIGHT" file="V_chinese_knot_LIGHT.obj"/>
-    <mesh class="visual" name="V_ENDPOINT" file="V_ENDPOINT.obj"/>
-    <mesh class="visual" name="V_LANTERN_BODY_BK" file="V_LANTERN_BODY_BK.obj"/>
 
     <!-- Collision meshes -->
   </asset>
@@ -61,8 +52,6 @@
   <worldbody>
 
     <body name="B_body" pos="0.0 0.0 0.0" quat="1.0 0.0 0.0 0.0">
-      <!-- <geom name="Way_Point_3" class="visual" mesh="V_LANTERN_BODY_BK" pos="0.0 32.5 2.5" quat="1.0 0.0 0.0 0.0" material="MI_LANTERN_BODY_BK"/> -->
-      <geom name="End_Point_3" class="visual" mesh="V_LANTERN_BODY_BK" pos="0.0 32.5 2.5" quat="1.0 0.0 0.0 0.0" material="MI_LANTERN_BODY_BK"/>
       <geom class="visual" mesh="V_chinese_knot_BK" pos="-1.1920928955078125e-07 32.29999923706055 1.4972995519638062" quat="1.0 0.0 0.0 0.0" material="MI_chinese_knot_BK"/>
       <geom class="visual" mesh="V_chinese_knot_LIGHT" pos="-4.541306708460979e-08 32.30000305175781 1.4885804653167725" quat="1.0 0.0 0.0 0.0" material="MI_white_light"/>
       <geom class="visual" mesh="V_S3_BEGIN_BK" pos="4.76837158203125e-07 26.329627990722656 1.2940952777862549" quat="1.0 0.0 0.0 0.0" material="MI_S3_BEGIN_BK"/>

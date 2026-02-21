@@ -31,16 +31,23 @@
     <attach model="section01V" prefix="V_"/>   <!-- 视觉模型前缀V_ -->
     <attach model="section01C" prefix="C_"/>   <!-- 碰撞模型前缀C_ -->
     
+    <body name="wp_endpoint_body" pos="0.0 0.0 0.5">
+      <geom name="wp_endpoint_trigger" type="sphere" size="0.3" rgba="0 1 0 0.5" contype="0" conaffinity="0" group="0"/>
+    </body>
+    
   </worldbody>
 
   <sensor>
     <!-- 传感器配置 -->
-    <!-- The "C" prefix suggests this is part of the collision model (as opposed to visual model) -->
     <contact name="FR_foot_contact" subtree1="FR_foot" subtree2="C_B_BODY" data="normal" num="1" />
     <contact name="FL_foot_contact" subtree1="FL_foot" subtree2="C_B_BODY" data="normal" num="1" />
     <contact name="RR_foot_contact" subtree1="RR_foot" subtree2="C_B_BODY" data="normal" num="1" />
     <contact name="RL_foot_contact" subtree1="RL_foot" subtree2="C_B_BODY" data="normal" num="1" />
+    <!-- 基座接触传感器 -->
     <contact name="base_contact" subtree1="base" subtree2="C_B_BODY" data="normal" num="1" />
+    
+    <!-- 路径点接触检测传感器 -->
+    <contact name="wp_endpoint_body_contact" subtree1="base" subtree2="wp_endpoint_body" data="normal" num="1" />
   </sensor>
 
 </mujoco>

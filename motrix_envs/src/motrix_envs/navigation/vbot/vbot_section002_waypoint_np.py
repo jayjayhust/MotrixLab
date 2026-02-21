@@ -113,7 +113,7 @@ class VBotSection002WaypointEnv(NpEnv):
                     self.default_angles[i] = angle
         
         self._init_dof_pos[-self._num_action:] = self.default_angles
-        self.action_filter_alpha = 0.35  # 平衡滤波强度，既减少抖动又保持响应性
+        self.action_filter_alpha = 0.25  # 降低滤波系数，更强的平滑效果减少动作过大
     
     def _find_target_marker_dof_indices(self):
         """查找target_marker在dof_pos中的索引位置"""
@@ -978,6 +978,13 @@ class VBotSection002WaypointEnv(NpEnv):
             print(f"[Warning] abs_gyro_z contains large values: {large_values}")
             terminated = np.logical_or(terminated, abs_gyro_z > 20)
 
+        # X轴越界终止：当机器人X坐标abs >= 5.0时终止
+        pose = self._body.get_pose(data)
+        robot_x = pose[:, 0]
+        x_out_of_bounds = np.abs(robot_x) >= 5.0  # X轴越界终止,这个参数后面也移到配置文件中
+        terminated = np.logical_or(terminated, x_out_of_bounds)
+        x_oob_count = int(x_out_of_bounds.sum())
+
         # 调试：统计终止原因
         if terminated.any():
             timeout_count = int(timeout.sum())
@@ -985,7 +992,7 @@ class VBotSection002WaypointEnv(NpEnv):
             gyro_abnormal_count = int(large_values.sum())
             total = int(terminated.sum())
             if total > 0 and state.info["steps"][0] % 100 == 0:  # 每100步打印一次
-                print(f"[termination] total={total} timeout={timeout_count} contact={contact_count} gyro={gyro_abnormal_count}")
+                print(f"[termination] total={total} timeout={timeout_count} contact={contact_count} gyro={gyro_abnormal_count} x_oob={x_oob_count}")
                 pass
         
         return state.replace(terminated=terminated)
@@ -1128,6 +1135,11 @@ class VBotSection002WaypointEnv(NpEnv):
         termination_penalty = np.where(side_flip_mask, -20.0, termination_penalty)
         # print(f"[termination_penalty] side_flip_count={side_flip_mask.sum()}")
         
+        # X轴越界惩罚：当机器人偏离赛道太远时结束
+        robot_x = pose[:, 0]
+        x_out_of_bounds = np.abs(robot_x) >= 5.0
+        termination_penalty = np.where(x_out_of_bounds, -20.0, termination_penalty)
+        
         # 线速度跟踪奖励（适配楼梯地形）
         base_lin_vel = self._model.get_sensor_value(self._cfg.sensor.base_linvel, data)
         lin_vel_error = np.sum(np.square(velocity_commands[:, :2] - base_lin_vel[:, :2]), axis=1)
@@ -1253,6 +1265,34 @@ class VBotSection002WaypointEnv(NpEnv):
         # 动作变化惩罚
         action_diff = info["current_actions"] - info["last_actions"]
         action_rate_penalty = np.sum(np.square(action_diff), axis=1)
+        
+        # ===== 陡峭楼梯区域检测 (wp_1-4 到 wp_2-2 之间) =====
+        # 检测机器人是否在陡峭楼梯区域: Y位置在8~15m之间，且有上坡趋势
+        robot_y = robot_position[:, 1]
+        vertical_vel = slope_features['vertical_velocity']
+        in_steep_stair_zone = np.logical_and(
+            np.logical_and(robot_y > 7.5, robot_y < 15.5),  # Y位置在陡峭区域
+            vertical_vel > -0.2  # 有上坡或平地趋势（允许小幅下坡波动）
+        )
+        
+        # 陡峭楼梯区域: 适度降低动作变化惩罚（保守版）
+        steep_stair_action_rate_scale = np.where(in_steep_stair_zone, 0.5, 1.0)  # 陡峭区域惩罚降低到50%
+        action_rate_penalty = action_rate_penalty * steep_stair_action_rate_scale
+        
+        # 陡峭楼梯区域: 大动作奖励（保守版）
+        action_magnitude = np.sum(np.square(info["current_actions"]), axis=1)
+        large_action_bonus = np.where(
+            in_steep_stair_zone,
+            np.clip(action_magnitude * 0.2, 0, 1.0),  # 动作幅度奖励，上限1.0
+            0.0
+        )
+        
+        # 陡峭楼梯区域: 高度增益奖励（保守版）
+        height_gain_bonus = np.where(
+            in_steep_stair_zone,
+            np.clip(vertical_vel * 1.5, 0, 1.0),  # 向上速度奖励，上限1.0
+            0.0
+        )
         
         # ===== 新增：前进方向奖励机制 =====
         # 鼓励机器人正面朝向运动方向，防止侧身或倒着走
@@ -1402,12 +1442,12 @@ class VBotSection002WaypointEnv(NpEnv):
             (
                 stop_bonus
                 + arrival_bonus
-                - 0.1 * lin_vel_z_penalty    # 极度减少Z轴惩罚，完全允许上下楼梯
+                - 0.1 * lin_vel_z_penalty    # Z轴惩罚（保守版，防止跳跃摔倒）
                 - 0.01 * ang_vel_xy_penalty  # 进一步减少XY角速度惩罚
                 - 0.0 * orientation_penalty
                 - 0.00001 * torque_penalty
                 - 0.0 * dof_vel_penalty
-                - 0.0002 * action_rate_penalty  # 进一步减少动作变化惩罚
+                - 0.001 * action_rate_penalty   # 到达后也限制动作幅度
                 - 0.3 * gait_symmetry_penalty   # 到达后也维持步态对称性
                 + termination_penalty
             ),
@@ -1429,12 +1469,14 @@ class VBotSection002WaypointEnv(NpEnv):
                 + stair_climb_incentive          # 楼梯攀登激励奖励
                 + downhill_incentive             # 下坡激励奖励
                 + downhill_stability             # 下坡稳定性奖励
-                - 0.1 * lin_vel_z_penalty    # 进一步减少Z轴惩罚
+                + large_action_bonus             # 陡峭楼梯大动作奖励
+                + height_gain_bonus              # 陡峭楼梯高度增益奖励
+                - 0.1 * lin_vel_z_penalty    # Z轴惩罚（保守版，防止跳跃摔倒）
                 - 0.01 * ang_vel_xy_penalty  # 进一步减少XY角速度惩罚
                 - 0.0 * orientation_penalty
                 - 0.00001 * torque_penalty
                 - 0.0 * dof_vel_penalty
-                - 0.00008 * action_rate_penalty  # 适度减少动作变化惩罚
+                - 0.002 * action_rate_penalty   # 增加动作变化惩罚，抑制动作过大
                 - 0.5 * gait_symmetry_penalty    # 步态对称性惩罚，防止单腿持续抬起
                 + termination_penalty
             )
@@ -1457,6 +1499,13 @@ class VBotSection002WaypointEnv(NpEnv):
             vert_vel_mean = float(np.mean(np.abs(slope_features['vertical_velocity'])))
             edge_dist_mean = float(np.mean(foot_edge_distance))
             dyn_stab_mean = float(np.mean(dyn_stability_reward))
+            
+            # 陡峭楼梯区域统计
+            steep_zone_count = int(in_steep_stair_zone.sum())
+            large_action_bonus_mean = float(np.mean(large_action_bonus))
+            height_gain_bonus_mean = float(np.mean(height_gain_bonus))
+            if steep_zone_count > 0:
+                print(f"[steep_stair] envs={steep_zone_count}/{total_envs}, action_bonus={large_action_bonus_mean:.3f}, height_bonus={height_gain_bonus_mean:.3f}")
             
             # 添加NaN检查和处理
             if np.any(np.isnan(distance_to_target)):

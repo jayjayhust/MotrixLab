@@ -25,9 +25,10 @@
   </default>
 
   <worldbody>
-
-    <body name="B_BODY" pos="0.0 0.0 0.0" quat="1.0 0.0 0.0 0.0">
-      <geom name="Cylinder01" class="C_SECTION01_Cylinder"/>
+    <body name="ground_root">
+      <body name="B_BODY" pos="0.0 0.0 0.0" quat="1.0 0.0 0.0 0.0">
+        <geom name="Cylinder01" class="C_SECTION01_Cylinder"/>
+      </body>
     </body>
   </worldbody>
 

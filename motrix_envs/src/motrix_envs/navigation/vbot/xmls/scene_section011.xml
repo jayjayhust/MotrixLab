@@ -20,16 +20,18 @@
     <texture type="skybox" builtin="gradient" rgb1="0.3 0.5 0.7" rgb2="0 0 0" width="512" height="3072"/>
     
     <!-- 加载需要的模型 -->
-    <model name="section01V" file="0202_V_section01.xml"/>
-    <model name="section01C" file="0126_C_section01.xml"/>
+    <model name="section01V" file="0202_V_section01.xml"/>  <!-- 视觉模型 -->
+    <model name="section01C" file="0126_C_section01.xml"/>  <!-- 碰撞模型 -->
+    <model name="section00V" file="0202_V_section00.xml"/>  
   </asset>
 
   <worldbody>
-    <light pos="0 0 10" dir="0 0 -1" directional="true" />
+    <!-- <light pos="0 0 10" dir="0 0 -1" directional="true" /> -->
     
     <!-- 直接加载模型，不嵌套在body中 -->
     <attach model="section01V" prefix="V_"/>   <!-- 视觉模型前缀V_ -->
     <attach model="section01C" prefix="C_"/>   <!-- 碰撞模型前缀C_ -->
+    <attach model="section00V" prefix="W_"/>
     
   </worldbody>
 

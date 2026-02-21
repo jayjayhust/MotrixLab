@@ -19,30 +19,50 @@
   <asset>
     <texture type="skybox" builtin="gradient" rgb1="0.3 0.5 0.7" rgb2="0 0 0" width="512" height="3072"/>
     
-    <!-- 加载section01地形模型 - 使用0126版本 -->
-    <model name="section01C" file="0126_C_section01.xml"/>
+    <!-- 加载需要的模型 -->
+    <model name="section01V" file="0202_V_section01.xml"/>  <!-- 视觉模型 -->
+    <model name="section01C" file="0126_C_section01.xml"/>  <!-- 碰撞模型 -->
+    <model name="section02C" file="0131_C_section02_hotfix1.xml"/> 
+    <model name="section02V" file="0202_V_section02.xml"/>  
+    <model name="section03C" file="0126_C_section03.xml"/> 
+    <model name="section03V" file="0202_V_section03.xml"/>  
+
+    <model name="section00V" file="0202_V_section00.xml"/>  
   </asset>
 
   <worldbody>
-    <light pos="0 0 10" dir="0 0 -1" directional="true" />
+    <!-- <light pos="0 0 10" dir="0 0 -1" directional="true" /> -->
     
-    <!-- 加载section01地形 -->
-    <attach model="section01C" prefix="0"/>   
+    <!-- 直接加载模型，不嵌套在body中 -->
+    <attach model="section01V" prefix="V1_"/>   <!-- 视觉模型前缀V_ -->
+    <attach model="section01C" prefix="C1_"/>   <!-- 碰撞模型前缀C_ -->
+    <attach model="section02C" prefix="C2_"/>
+    <attach model="section02V" prefix="V2_"/> 
+    <attach model="section03C" prefix="C3_"/>
+    <attach model="section03V" prefix="V3_"/> 
+    <attach model="section00V" prefix="W_"/>
+    
   </worldbody>
 
-
-
   <sensor>
-    <!-- <contact name="FR_foot_contact" body1="FR_foot" body2="0B_Abianjie" data="normal" num="1" />
-    <contact name="FL_foot_contact" body1="FL_foot" body2="0B_Abianjie" data="normal" num="1" />
-    <contact name="RR_foot_contact" body1="RR_foot" body2="0B_Abianjie" data="normal" num="1" />
-    <contact name="RL_foot_contact" body1="RL_foot" body2="0B_Abianjie" data="normal" num="1" /> -->
-    <contact name="FR_foot_contact" subtree1="FR_foot" subtree2="0ground_root" data="normal" num="1" />
-    <contact name="FL_foot_contact" subtree1="FL_foot" subtree2="0ground_root" data="normal" num="1" />
-    <contact name="RR_foot_contact" subtree1="RR_foot" subtree2="0ground_root" data="normal" num="1" />
-    <contact name="RL_foot_contact" subtree1="RL_foot" subtree2="0ground_root" data="normal" num="1" />
-    <!-- 基座碰撞检测传感器：检测基座与地形的碰撞 -->
-    <contact name="base_contact" subtree1="base" subtree2="0ground_root" data="normal" num="1" />
+    <!-- 传感器配置 -->
+    <contact name="FR_foot_contact_1" subtree1="FR_foot" subtree2="C1_ground_root" data="normal" num="1" />
+    <contact name="FL_foot_contact_1" subtree1="FL_foot" subtree2="C1_ground_root" data="normal" num="1" />
+    <contact name="RR_foot_contact_1" subtree1="RR_foot" subtree2="C1_ground_root" data="normal" num="1" />
+    <contact name="RL_foot_contact_1" subtree1="RL_foot" subtree2="C1_ground_root" data="normal" num="1" />
+    <contact name="base_contact_1" subtree1="base" subtree2="C1_ground_root" data="normal" num="1" />
+
+    <contact name="FR_foot_contact_2" subtree1="FR_foot" subtree2="C2_ground_root" data="normal" num="1" />
+    <contact name="FL_foot_contact_2" subtree1="FL_foot" subtree2="C2_ground_root" data="normal" num="1" />
+    <contact name="RR_foot_contact_2" subtree1="RR_foot" subtree2="C2_ground_root" data="normal" num="1" />
+    <contact name="RL_foot_contact_2" subtree1="RL_foot" subtree2="C2_ground_root" data="normal" num="1" />
+    <contact name="base_contact_2" subtree1="base" subtree2="C2_ground_root" data="normal" num="1" />
+
+    <contact name="FR_foot_contact_3" subtree1="FR_foot" subtree2="C3_ground_root" data="normal" num="1" />
+    <contact name="FL_foot_contact_3" subtree1="FL_foot" subtree2="C3_ground_root" data="normal" num="1" />
+    <contact name="RR_foot_contact_3" subtree1="RR_foot" subtree2="C3_ground_root" data="normal" num="1" />
+    <contact name="RL_foot_contact_3" subtree1="RL_foot" subtree2="C3_ground_root" data="normal" num="1" />
+    <contact name="base_contact_3" subtree1="base" subtree2="C3_ground_root" data="normal" num="1" />
   </sensor>
 
 </mujoco>

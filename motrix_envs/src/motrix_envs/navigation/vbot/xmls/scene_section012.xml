@@ -23,14 +23,16 @@
     <!-- <model name="section02C" file="0126_C_section02.xml"/> -->
     <model name="section02C" file="0131_C_section02_hotfix1.xml"/> 
     <model name="section02V" file="0202_V_section02.xml"/>  
+    <model name="section00V" file="0202_V_section00.xml"/>  
   </asset>
 
   <worldbody>
-    <light pos="0 15 10" dir="0 0 -1" directional="true" />
+    <!-- <light pos="0 15 10" dir="0 0 -1" directional="true" /> -->
     
     <!-- 加载section02地形 -->
     <attach model="section02C" prefix="C_"/>
     <attach model="section02V" prefix="V_"/> 
+    <attach model="section00V" prefix="W_"/>
 
   </worldbody>
 
