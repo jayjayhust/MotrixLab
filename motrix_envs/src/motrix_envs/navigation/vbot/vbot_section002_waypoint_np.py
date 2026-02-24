@@ -53,12 +53,12 @@ class VBotSection002WaypointEnv(NpEnv):
         
         # 动作和观测空间
         self._action_space = gym.spaces.Box(low=-1.0, high=1.0, shape=(12,), dtype=np.float32)  # 12维动作空间
-        # 观测空间：67维（55 + 12维接触力）
+        # 观测空间：54维
         self._observation_space = gym.spaces.Box(low=-np.inf, high=np.inf, shape=(54,), dtype=np.float32)
         
-        self._num_dof_pos = self._model.num_dof_pos
-        self._num_dof_vel = self._model.num_dof_vel
-        self._num_action = self._model.num_actuators
+        self._num_dof_pos = self._model.num_dof_pos  # The number of DoF positions in the world.
+        self._num_dof_vel = self._model.num_dof_vel  # The number of DoF velocities in the world.
+        self._num_action = self._model.num_actuators  # The number of actuators in the robot.
         
         # 初始化DOF位置和速度
         # DOF pos 维度：36
@@ -66,6 +66,8 @@ class VBotSection002WaypointEnv(NpEnv):
         self._init_dof_pos = self._model.compute_init_dof_pos()
         print(f"Init DOF Pos array len : {len(self._init_dof_pos)}")
         # DOF vel 维度：33
+        # This value may be different from the [num_dof_pos] because for 
+        # some joint (like ball joint), we use Quaternion to represent the rotation, which has 4 components.
         # 分别是：?
         self._init_dof_vel = np.zeros((self._model.num_dof_vel,), dtype=np.float32)
         print(f"Init DOF Vel array len : {len(self._init_dof_vel)}")
@@ -500,9 +502,11 @@ class VBotSection002WaypointEnv(NpEnv):
         return geom.get_pose(data)
 
     def get_dof_pos(self, data: mtx.SceneData):
+        """获取机器人body下属的各关节位置"""
         return self._body.get_joint_dof_pos(data)
     
     def get_dof_vel(self, data: mtx.SceneData):
+        """获取机器人body下属的各关节速度"""
         return self._body.get_joint_dof_vel(data)
     
     def _extract_root_state(self, data):
@@ -834,8 +838,8 @@ class VBotSection002WaypointEnv(NpEnv):
         else:
             reached_all = reached_position
         
-        # 计算期望速度命令（与平地navigation一致，简单P控制器）
-        desired_vel_xy = np.clip(position_error * 1.0, -1.0, 1.0)
+        # 计算期望速度命令（降低速度优先稳定性）
+        desired_vel_xy = np.clip(position_error * 0.8, -0.6, 0.6)  # 降低最大速度1.0→0.6
         desired_vel_xy = np.where(reached_all[:, np.newaxis], 0.0, desired_vel_xy)
         
         # 角速度命令：改进的转向策略
@@ -850,15 +854,15 @@ class VBotSection002WaypointEnv(NpEnv):
         large_turn_required = np.abs(heading_to_movement) > np.deg2rad(60)  # 需要大于60度转向
         
         # 对于大转向情况，降低前进速度，提高转向速度
-        turn_priority_factor = np.where(large_turn_required, 0.3, 1.0)  # 大转向时前进速度降为30%
-        turn_amplification = np.where(large_turn_required, 1.5, 1.0)    # 大转向时转向增益提高50%
+        turn_priority_factor = np.where(large_turn_required, 0.2, 1.0)  # 大转向时前进速度降为20%
+        turn_amplification = np.where(large_turn_required, 1.2, 1.0)    # 大转向时转向增益提高20%
         
-        # 计算期望速度命令
-        desired_vel_xy = np.clip(position_error * 1.0 * turn_priority_factor[:, np.newaxis], -1.0, 1.0)
+        # 计算期望速度命令（降低速度优先稳定性）
+        desired_vel_xy = np.clip(position_error * 0.8 * turn_priority_factor[:, np.newaxis], -0.6, 0.6)
         desired_vel_xy = np.where(reached_all[:, np.newaxis], 0.0, desired_vel_xy)
         
-        # 转向命令（增强版）
-        desired_yaw_rate = np.clip(heading_to_movement * 1.0 * turn_amplification, -1.5, 1.5)  # 提高转向上限到1.5
+        # 转向命令（降低转向速度防止失稳）
+        desired_yaw_rate = np.clip(heading_to_movement * 0.8 * turn_amplification, -1.0, 1.0)  # 降低转向上限1.5→1.0
         deadband_yaw = np.deg2rad(8)
         desired_yaw_rate = np.where(np.abs(heading_to_movement) < deadband_yaw, 0.0, desired_yaw_rate)
         desired_yaw_rate = np.where(reached_all, 0.0, desired_yaw_rate)
@@ -907,7 +911,7 @@ class VBotSection002WaypointEnv(NpEnv):
             ],
             axis=-1,
         )
-        assert obs.shape == (data.shape[0], 54)  # 54 + 1 = 55维
+        assert obs.shape == (data.shape[0], 54)  # 54维
         
         # 更新目标标记和箭头
         self._update_target_marker(data, pose_commands)
@@ -933,6 +937,11 @@ class VBotSection002WaypointEnv(NpEnv):
         """
         data = state.data
         terminated = np.zeros(self._num_envs, dtype = bool)
+
+        # 打印前10个env各自的episode step
+        steps = state.info["steps"]
+        display_steps = steps[:10] if len(steps) > 10 else steps
+        print(f"[Episode Steps] First 10 envs: {display_steps}")
 
         # 超时终止
         timeout = np.zeros(self._num_envs, dtype=bool)
@@ -985,14 +994,40 @@ class VBotSection002WaypointEnv(NpEnv):
         terminated = np.logical_or(terminated, x_out_of_bounds)
         x_oob_count = int(x_out_of_bounds.sum())
 
+        # 机器狗倾覆终止：倾斜角度超过85°（适配崎岖地面和下坡地形）
+        root_quat = pose[:, 3:7]
+        proj_g = self._compute_projected_gravity(root_quat)
+        gxy = np.linalg.norm(proj_g[:, :2], axis=1)
+        gz = proj_g[:, 2]
+        tilt_angle = np.arctan2(gxy, np.abs(gz))
+        
+        # 获取线速度和陀螺仪数据用于俯冲检测
+        base_lin_vel = self._model.get_sensor_value(self._cfg.sensor.base_linvel, data)
+        gyro = self._model.get_sensor_value(self._cfg.sensor.base_gyro, data)
+        
+        # 计算俯仰角（绕Y轴旋转）：从重力投影估算
+        # proj_g[:, 0] 是重力在机器人X轴的投影，前倾时为正
+        pitch_angle = np.arctan2(proj_g[:, 0], np.abs(proj_g[:, 2]))
+        
+        # 俯冲速度：X轴线速度（前进方向）
+        forward_vel = base_lin_vel[:, 0]
+        
+        # 俯冲危险检测：前倾角度大且速度快时，降低倾覆阈值
+        # 正常情况：85°阈值；俯冲状态（前倾>30°且速度>1.5m/s）：60°阈值
+        diving_mask = np.logical_and(pitch_angle > np.deg2rad(30), forward_vel > 1.5)
+        dynamic_threshold = np.where(diving_mask, np.deg2rad(60), np.deg2rad(85))
+        rollover_mask = tilt_angle > dynamic_threshold
+        terminated = np.logical_or(terminated, rollover_mask)
+
         # 调试：统计终止原因
         if terminated.any():
             timeout_count = int(timeout.sum())
             contact_count = int(base_contact.sum())
             gyro_abnormal_count = int(large_values.sum())
+            rollover_count = int(rollover_mask.sum())
             total = int(terminated.sum())
             if total > 0 and state.info["steps"][0] % 100 == 0:  # 每100步打印一次
-                print(f"[termination] total={total} timeout={timeout_count} contact={contact_count} gyro={gyro_abnormal_count} x_oob={x_oob_count}")
+                print(f"[termination] total={total} timeout={timeout_count} contact={contact_count} gyro={gyro_abnormal_count} x_oob={x_oob_count} rollover={rollover_count}")
                 pass
         
         return state.replace(terminated=terminated)
@@ -1204,7 +1239,8 @@ class VBotSection002WaypointEnv(NpEnv):
         
         heading_threshold = np.deg2rad(15)
         reached_heading = np.abs(heading_diff) < heading_threshold
-        reached_all = np.logical_and(reached_position, reached_heading)
+        # reached_all = np.logical_and(reached_position, reached_heading)
+        reached_all = reached_position
         # reached_all只在到达最后一个路径点时才置位
         if len(self.way_points) > 0:
             all_waypoints_visited = np.array([
@@ -1327,9 +1363,12 @@ class VBotSection002WaypointEnv(NpEnv):
         # 鼓励交替迈步的自然步态
         foot_contact_pattern = np.zeros(self._num_envs, dtype=np.float32)
         gait_symmetry_penalty = np.zeros(self._num_envs, dtype=np.float32)  # 步态对称性惩罚
+        leg_air_time_penalty = np.zeros(self._num_envs, dtype=np.float32)  # 单腿滠空惩罚
+        ground_contact_reward = np.zeros(self._num_envs, dtype=np.float32)  # 接地奖励
         try:
             # 简化的步态节奏检测：基于足端Z坐标变化
             foot_heights = {}  # 存储各足端高度用于对称性检测
+            legs_in_air = 0  # 计算滠空腿数
             for i, foot_name in enumerate(['FR', 'FL', 'RR', 'RL']):
                 foot_pos_sensor = f'{foot_name}_foot_pos'
                 foot_pos = self._model.get_sensor_value(foot_pos_sensor, data)
@@ -1338,6 +1377,9 @@ class VBotSection002WaypointEnv(NpEnv):
                 foot_heights[foot_name] = foot_height
                 # 简单的步态节奏奖励：鼓励足端有一定抬升
                 foot_contact_pattern += np.clip((foot_height - 0.05) * 2.0, 0, 1)
+                # 检测足端是否接地（高度<0.03m认为接地）
+                is_on_ground = foot_height < 0.03
+                ground_contact_reward += is_on_ground.astype(np.float32) * 0.25  # 每只脚接地到0.25分
             
             # ===== 新增：步态对称性惩罚 =====
             # 四足动物自然步态中，对角腿成对运动（trot gait）
@@ -1350,9 +1392,21 @@ class VBotSection002WaypointEnv(NpEnv):
                 np.clip((diagonal1_asymmetry - 0.03) * 5.0, 0, 1) + 
                 np.clip((diagonal2_asymmetry - 0.03) * 5.0, 0, 1)
             )
+            
+            # ===== 新增：极端滠空惩罚（只惩罚持续不落地的情况）=====
+            # 只惩罚腿抬得太高且持续不落地的情况
+            fl_high = foot_heights['FL'] > 0.12  # 提高阈值，允许正常抬腿
+            rr_high = foot_heights['RR'] > 0.12
+            fr_high = foot_heights['FR'] > 0.12
+            rl_high = foot_heights['RL'] > 0.12
+            # 只惩罚三只脚或四只脚同时高抬的极端情况
+            legs_high_count = fl_high.astype(np.float32) + rr_high.astype(np.float32) + fr_high.astype(np.float32) + rl_high.astype(np.float32)
+            leg_air_time_penalty = np.clip(legs_high_count - 2, 0, 2) * 1.0  # 只惩罚3+腿同时高抬
         except:
             foot_contact_pattern = np.zeros(self._num_envs, dtype=np.float32)
             gait_symmetry_penalty = np.zeros(self._num_envs, dtype=np.float32)
+            leg_air_time_penalty = np.zeros(self._num_envs, dtype=np.float32)
+            ground_contact_reward = np.zeros(self._num_envs, dtype=np.float32)
         
         # ===== 改进：楼梯攀登专用奖励 =====
         # 垂直运动奖励：鼓励合理的上升下降
@@ -1442,13 +1496,15 @@ class VBotSection002WaypointEnv(NpEnv):
             (
                 stop_bonus
                 + arrival_bonus
-                - 0.1 * lin_vel_z_penalty    # Z轴惩罚（保守版，防止跳跃摔倒）
-                - 0.01 * ang_vel_xy_penalty  # 进一步减少XY角速度惩罚
+                + 0.2 * ground_contact_reward     # 接地奖励（降低）
+                - 0.2 * lin_vel_z_penalty    # Z轴惩罚（提高，防止跳跃摔倒）
+                - 0.03 * ang_vel_xy_penalty  # XY角速度惩罚（提高，防止摇晃）
                 - 0.0 * orientation_penalty
                 - 0.00001 * torque_penalty
                 - 0.0 * dof_vel_penalty
                 - 0.001 * action_rate_penalty   # 到达后也限制动作幅度
                 - 0.3 * gait_symmetry_penalty   # 到达后也维持步态对称性
+                - 0.1 * leg_air_time_penalty    # 极端滠空惩罚
                 + termination_penalty
             ),
             # 未到达：正常奖励（平衡激进性与稳定性）
@@ -1459,7 +1515,8 @@ class VBotSection002WaypointEnv(NpEnv):
                 + 0.8 * turn_preparation_reward   # 转向准备奖励（新增）
                 + 1.0 * heading_alignment_reward  # 转向完成奖励（新增）
                 + 1.2 * waypoint_proximity_turning # waypoint接近时转向奖励（新增）
-                + 0.4 * foot_contact_pattern      # 步态节奏奖励
+                + 0.6 * foot_contact_pattern      # 步态节奏奖励（提高，鼓励抬腿）
+                + 0.15 * ground_contact_reward    # 接地奖励（降低，允许抬腿）
                 + approach_reward            # 接近奖励
                 + 0.35 * slope_adaptation_reward # 坡度适应奖励（恢复）
                 + 0.55 * edge_distance_reward    # 足端边缘距离奖励（提高）
@@ -1469,15 +1526,16 @@ class VBotSection002WaypointEnv(NpEnv):
                 + stair_climb_incentive          # 楼梯攀登激励奖励
                 + downhill_incentive             # 下坡激励奖励
                 + downhill_stability             # 下坡稳定性奖励
-                + large_action_bonus             # 陡峭楼梯大动作奖励
-                + height_gain_bonus              # 陡峭楼梯高度增益奖励
-                - 0.1 * lin_vel_z_penalty    # Z轴惩罚（保守版，防止跳跃摔倒）
-                - 0.01 * ang_vel_xy_penalty  # 进一步减少XY角速度惩罚
+                + large_action_bonus             # 陡峻楼梯大动作奖励
+                + height_gain_bonus              # 陡峻楼梯高度增益奖励
+                - 0.2 * lin_vel_z_penalty    # Z轴惩罚（提高，防止跳跃摔倒）
+                - 0.03 * ang_vel_xy_penalty  # XY角速度惩罚（提高，防止摇晃）
                 - 0.0 * orientation_penalty
                 - 0.00001 * torque_penalty
                 - 0.0 * dof_vel_penalty
                 - 0.002 * action_rate_penalty   # 增加动作变化惩罚，抑制动作过大
-                - 0.5 * gait_symmetry_penalty    # 步态对称性惩罚，防止单腿持续抬起
+                - 0.4 * gait_symmetry_penalty    # 步态对称性惩罚（降低0.8→0.4）
+                - 0.2 * leg_air_time_penalty     # 极端滠空惩罚（降低）
                 + termination_penalty
             )
         )
@@ -1537,8 +1595,8 @@ class VBotSection002WaypointEnv(NpEnv):
             print(f"[reward] reward={reward_mean}")
             visited_list = [list(s) for s in self.visited_waypoints[:10]]
             visited_list_count = [len(s) for s in self.visited_waypoints[:10]]
-            print(f"[waypoint] Visited_waypoints(first 10 envs): {visited_list}")
-            print(f"[waypoint] Visited_waypoints_count(first 10 envs): {visited_list_count}")
+            print(f"[waypoint] visited_waypoints(first 10 envs): {visited_list}")
+            print(f"[waypoint] visited_waypoints_count(first 10 envs): {visited_list_count}")
             
             # 转向行为调试信息
             turn_prep_mean = float(np.mean(turn_preparation_reward))  # 转向准备奖励的平均值
@@ -1799,7 +1857,7 @@ class VBotSection002WaypointEnv(NpEnv):
             axis=-1,
         )
         # print(f"obs.shape:{obs.shape}")
-        assert obs.shape == (num_envs, 54)  # 54 + 1 = 55维
+        assert obs.shape == (num_envs, 54)  # 54维
         
         # Info信息（包含目标位置命令、最后动作、步数、当前动作、过滤后动作、是否首次到达、最小距离）
         info = {

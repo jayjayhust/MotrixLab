@@ -772,8 +772,8 @@ class VBotSection002EnvCfg(VBotStairsEnvCfg):
 class VBotSection002WaypointEnvCfg(VBotStairsEnvCfg):
     """VBot Section002全地形训练配置"""
     model_file: str = os.path.dirname(__file__) + "/xmls/scene_section002_waypoint.xml"
-    max_episode_seconds: float = 100.0  # 拉长：从20秒增加到60秒(训练60.0, 测试80.0)
-    max_episode_steps: int = 10000  # 拉长：从2000步增加到6000步（本回合步数到达后会重新开始训练）(训练6000, 测试8000)
+    max_episode_seconds: float = 120.0  # 拉长：从20秒增加到60秒(训练60.0, 测试80.0)
+    max_episode_steps: int = 12000  # 拉长：从2000步增加到6000步（本回合步数到达后会重新开始训练）(训练6000, 测试8000)
     sim_dt: float = 0.01    # 仿真步长 10ms = 100Hz
     ctrl_dt: float = 0.01
     reset_yaw_scale: float = 0.1
@@ -842,7 +842,7 @@ class VBotSection002WaypointEnvCfg(VBotStairsEnvCfg):
                 {"name": "wp_2-1_body", "index": 7, "action": True},
                 {"name": "wp_3-1_body", "index": 8, "action": True}
             ],
-            "hard-4": [  # 最复杂,带14个途径点(不过吊桥),驻留点全部带庆祝动作
+            "hard-4": [  # 复杂,带15个途径点(不过吊桥,4个红包点),驻留点全部带庆祝动作
                 {"name": "wp_1-1_body", "index": 0, "action": False},
                 {"name": "wp_1-2_body", "index": 1, "action": False},
                 {"name": "wp_1-3_body", "index": 2, "action": False},
@@ -852,19 +852,37 @@ class VBotSection002WaypointEnvCfg(VBotStairsEnvCfg):
                 {"name": "wp_1-4_body", "index": 6, "action": True},
                 {"name": "wp_2-8_body", "index": 7, "action": False},
                 {"name": "wp_2-10_body", "index": 8, "action": False},
-                # {"name": "wp_2-11_body", "index": 9, "action": False},
                 {"name": "wp_2-5-1_body", "index": 9, "action": False},
                 {"name": "wp_2-5_body", "index": 10, "action": False},
-                {"name": "wp_2-9_body", "index": 11, "action": False},
-                {"name": "wp_2-6-1_body", "index": 12, "action": False},
-                {"name": "wp_2-6_body", "index": 13, "action": False},
-                {"name": "wp_2-6-2_body", "index": 14, "action": False},
-                {"name": "wp_2-7_body", "index": 15, "action": False},
-                {"name": "wp_2-12_body", "index": 16, "action": False},
-                {"name": "wp_2-1_body", "index": 17, "action": True},
-                {"name": "wp_3-1_body", "index": 18, "action": True}
+                {"name": "wp_2-5-2_body", "index": 11, "action": False},
+                {"name": "wp_2-9_body", "index": 12, "action": False},
+                {"name": "wp_2-1_body", "index": 13, "action": True},
+                {"name": "wp_3-1_body", "index": 14, "action": True}
             ],
-            "hard-5": [  # 最复杂,带17个途径点(吊桥和河床都通过),驻留点全部带庆祝动作
+            "hard-5": [  # 复杂,带20个途径点(不过吊桥,6个红包点),驻留点全部带庆祝动作
+                {"name": "wp_1-1_body", "index": 0, "action": False},
+                {"name": "wp_1-2_body", "index": 1, "action": False},
+                {"name": "wp_1-3_body", "index": 2, "action": False},
+                {"name": "wp_1-7_body", "index": 3, "action": False},
+                {"name": "wp_1-6_body", "index": 4, "action": False},
+                {"name": "wp_1-5_body", "index": 5, "action": False},
+                {"name": "wp_1-4_body", "index": 6, "action": True},
+                {"name": "wp_2-8_body", "index": 7, "action": False},
+                {"name": "wp_2-10_body", "index": 8, "action": False},
+                {"name": "wp_2-11_body", "index": 9, "action": False},
+                {"name": "wp_2-5-1_body", "index": 9, "action": False},
+                {"name": "wp_2-5_body", "index": 10, "action": False},
+                {"name": "wp_2-5-2_body", "index": 11, "action": False},
+                {"name": "wp_2-9_body", "index": 12, "action": False},
+                {"name": "wp_2-6-1_body", "index": 13, "action": False},
+                {"name": "wp_2-6_body", "index": 14, "action": False},
+                {"name": "wp_2-6-2_body", "index": 15, "action": False},
+                {"name": "wp_2-7_body", "index": 16, "action": False},
+                {"name": "wp_2-12_body", "index": 17, "action": False},
+                {"name": "wp_2-1_body", "index": 18, "action": True},
+                {"name": "wp_3-1_body", "index": 19, "action": True}
+            ],
+            "hard-6": [  # 最复杂,带17个途径点(吊桥和河床都通过),驻留点全部带庆祝动作
                 {"name": "wp_1-1_body", "index": 0, "action": False},
                 {"name": "wp_1-2_body", "index": 1, "action": False},
                 {"name": "wp_1-3_body", "index": 2, "action": False},
