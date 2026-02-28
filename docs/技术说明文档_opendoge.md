@@ -26,19 +26,7 @@
 | Policy Network | (256, 128, 64) | ReLU |
 | Value Network | (256, 128, 64) | ReLU |
 
-- **观测空间维度**: 54维，具体组成如下：
-  - 基座线速度 (base_lin_vel): 3维
-  - 基座角速度 (base_gyro): 3维
-  - 投影重力向量 (projected_gravity): 3维
-  - 相对关节位置 (joint_pos_rel): 12维
-  - 关节速度 (joint_vel): 12维
-  - 上一步动作 (last_actions): 12维
-  - 归一化速度命令 (command_normalized): 3维
-  - 归一化位置误差 (position_error_normalized): 2维
-  - 归一化朝向误差 (heading_error_normalized): 1维
-  - 归一化距离 (distance_normalized): 1维
-  - 到达标志 (reached_flag): 1维
-  - 停止就绪标志 (stop_ready_flag): 1维
+- **观测空间维度**: 54维
 - **动作空间维度**: 12维（对应12个关节执行器）
 
 #### 1.1.3 关键超参
