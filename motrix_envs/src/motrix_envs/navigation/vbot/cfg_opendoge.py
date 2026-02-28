@@ -770,7 +770,7 @@ class VBotSection002WaypointEnvCfg(VBotStairsEnvCfg):
     model_file: str = os.path.dirname(__file__) + "/xmls/scene_section002_waypoint.xml"
     max_episode_seconds: float = 120.0  # 拉长：从20秒增加到12秒
     max_episode_steps: int = 12000  # 拉长：从2000步增加到12000步（本回合步数到达后会重新开始训练）
-    sim_dt: float = 0.01    # 仿真步长 10ms = 100Hz
+    sim_dt: float = 0.01    # 仿真步长 10ms = 100Hz(sim_dt=0.01s, max_episode_steps 12000 equals 120 seconds)
     ctrl_dt: float = 0.01
     reset_yaw_scale: float = 0.1
     max_dof_vel: float = 100.0  # 最大关节速度阈值，训练初期给予更大容忍度

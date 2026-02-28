@@ -2,11 +2,12 @@
 <mujoco model="vbot">
   <compiler angle="radian" meshdir="meshes/" />
   <option cone="elliptic" impratio="100" />
+  
   <default>
     <material specular="0" shininess="0.25"/>
     <default class="vita">
-      <geom friction="0.4" margin="0.001" condim="3" />
-      <joint axis="0 1 0" damping="0.1" armature="0.0043" frictionloss="0.2" />
+      <geom friction="0.6" margin="0.001" condim="3" />
+      <joint axis="0 1 0" damping="0.15" armature="0.0043" frictionloss="0.25" />
       <motor forcerange="-17 17" />
       <default class="R_hip_joint">
         <joint
@@ -39,9 +40,9 @@
                     range="-2.6387 -0.7854"
                     actuatorfrcrange="-34 34"
                     limited="true"
-                    damping="0.1"
+                    damping="0.15"
                     armature="0.04"
-                    frictionloss="0.2"
+                    frictionloss="0.3"
                 />
         <motor forcerange="-34 34" />
       </default>
@@ -51,11 +52,12 @@
       <default class="collision">
         <geom group="3" rgba="0.752941 0.752941 0.752941 1" />
         <default class="foot">
-          <geom size="0.021" quat="0.707107 -0.707107 0 0" pos="0 0 0" />
+          <geom size="0.021" quat="0.707107 -0.707107 0 0" pos="0 0 0" friction="0.8" />
         </default>
       </default>
     </default>
   </default>
+
   <asset>
     <mesh name="base_link" file="base_link.STL" />
     <mesh name="FR_hip" file="FR_hip.STL" />
@@ -83,11 +85,13 @@
     <!-- 目标箭头材质 -->
     <material name="target_green" rgba="0 1 0 0.9"/>
   </asset>
+
   <worldbody>
     <light name="spotlight" mode="targetbodycom" target="base" pos="0 -1 2" cutoff="30"/>
     
     <!-- 目标位置标记：三维箭头 (圆柱+圆锥) -->
-    <body name="target_marker" pos="0 0 1.5">
+    <!-- <body name="target_marker" pos="0 0 1.5"> -->
+    <body name="target_marker" pos="0 0 2.0">
       <joint name="target_x" type="slide" axis="1 0 0" limited="false"/>
       <joint name="target_y" type="slide" axis="0 1 0" limited="false"/>
       <joint name="target_yaw" type="hinge" axis="0 0 1" limited="false"/>
@@ -118,14 +122,14 @@
                 rgba="0.498039 0.498039 0.498039 1"
                 mesh="head_yaw"
             />
-        <geom
+      <geom
                 type="mesh"
                 class="visual"
                 pos="0.17289 0 0.15552"
                 rgba="0.75294 0.75294 0.75294 1"
                 mesh="head_pitch"
             />
-        <geom
+      <geom
                 name="collision_head_box"
                 class="collision"
                 size="0.084602 0.078997 0.041873"
@@ -685,7 +689,17 @@
             pos="0.23 -0.3 0.09" quat="0.707107 0 0.707107 0"
             rgba="0 0 1 0.8" contype="0" conaffinity="0"/>
     </body>
+    
+    <!-- 楼梯辅助可视化标记 -->
+    <!-- 虚拟台阶边缘标记（仅用于调试可视化） -->
+    <body name="stair_edge_marker_1" pos="0 0 0.1" mocap="true">
+      <geom type="plane" size="0.01 0.5 0.01" rgba="1 0 0 0.3" contype="0" conaffinity="0"/>
+    </body>
+    <body name="stair_edge_marker_2" pos="0 0 0.2" mocap="true">
+      <geom type="plane" size="0.01 0.5 0.01" rgba="1 0 0 0.3" contype="0" conaffinity="0"/>
+    </body>
   </worldbody>
+  
   <actuator>
     <!-- FR - 前右 -->
     <motor class="vita" name="FR_hip_joint" joint="FR_hip_joint" />
@@ -704,6 +718,7 @@
     <motor class="vita" name="RL_thigh_joint" joint="RL_thigh_joint" />
     <motor class="calf_joint" name="RL_calf_joint" joint="RL_calf_joint" />
   </actuator>
+  
   <sensor>
     <!-- 关节位置传感器 - 按照与执行器相同的顺序排列 -->
     <!-- FR - 前右 -->
