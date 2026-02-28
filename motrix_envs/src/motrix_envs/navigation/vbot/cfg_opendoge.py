@@ -768,8 +768,8 @@ class VBotSection002EnvCfg(VBotStairsEnvCfg):
 class VBotSection002WaypointEnvCfg(VBotStairsEnvCfg):
     """VBot Section002全地形训练配置"""
     model_file: str = os.path.dirname(__file__) + "/xmls/scene_section002_waypoint.xml"
-    max_episode_seconds: float = 120.0  # 拉长：从20秒增加到60秒(训练60.0, 测试80.0)
-    max_episode_steps: int = 12000  # 拉长：从2000步增加到6000步（本回合步数到达后会重新开始训练）(训练6000, 测试8000)
+    max_episode_seconds: float = 120.0  # 拉长：从20秒增加到12秒
+    max_episode_steps: int = 12000  # 拉长：从2000步增加到12000步（本回合步数到达后会重新开始训练）
     sim_dt: float = 0.01    # 仿真步长 10ms = 100Hz
     ctrl_dt: float = 0.01
     reset_yaw_scale: float = 0.1

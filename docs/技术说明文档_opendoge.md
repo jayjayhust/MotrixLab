@@ -283,17 +283,18 @@ PPO更新
 
 **第一赛段训练:**
 ```bash
-python scripts/train.py --env MotrixArena_S1_section001_opendoge
+uv run scripts/train.py --env MotrixArena_S1_section001_opendoge
 ```
 
 **第二赛段训练:**
 ```bash
-python scripts/train.py --env MotrixArena_S1_section01_opendoge
+uv run scripts/train.py --env MotrixArena_S1_section01_opendoge
 ```
 
 **模型推理:**
 ```bash
-python scripts/play.py --env MotrixArena_S1_section001_opendoge --checkpoint runs/MotrixArena_S1_section001_opendoge/xx-xx-xx_PPO/checkpoints/best_agent.pickle
+uv run scripts/play.py --env MotrixArena_S1_section001_opendoge --checkpoint runs/MotrixArena_S1_section001_opendoge/xx-xx-xx_PPO/checkpoints/best_agent.pickle
+uv run scripts/play.py --env MotrixArena_S1_section01_opendoge --num-envs 10
 ```
 
 #### 权重下载说明
@@ -309,14 +310,14 @@ python scripts/play.py --env MotrixArena_S1_section001_opendoge --checkpoint run
 **第一赛段 (Section001):**
 - 训练步数: ~50M steps
 - 成功率: >95%
-- 平均奖励: ~15
-- 到达时间: ~8-12秒
+- 平均奖励: ~22
+- 到达时间: ~15-20秒
 
 **第二赛段 (Section01):**
 - 训练步数: ~80M steps
-- 成功率: ~85%
-- 平均奖励: ~12
-- 完成时间: ~60-90秒
+- 成功率: ~70%
+- 平均奖励: ~79
+- 完成时间: ~100-120秒
 
 #### 注意细节
 
