@@ -8,6 +8,8 @@
 
 #### 1.1.1 训练方式
 
+- **硬件环境**: RTX 5070Ti(自己的主机，没有在地瓜平台上训练)
+- **操作系统**: Ubuntu 22.04
 - **算法**: PPO (Proximal Policy Optimization)
 - **训练框架**: SKRL (基于JAX后端)
 - **仿真环境**: MotrixSim物理引擎
@@ -24,7 +26,19 @@
 | Policy Network | (256, 128, 64) | ReLU |
 | Value Network | (256, 128, 64) | ReLU |
 
-- **观测空间维度**: 54维
+- **观测空间维度**: 54维，具体组成如下：
+  - 基座线速度 (base_lin_vel): 3维
+  - 基座角速度 (base_gyro): 3维
+  - 投影重力向量 (projected_gravity): 3维
+  - 相对关节位置 (joint_pos_rel): 12维
+  - 关节速度 (joint_vel): 12维
+  - 上一步动作 (last_actions): 12维
+  - 归一化速度命令 (command_normalized): 3维
+  - 归一化位置误差 (position_error_normalized): 2维
+  - 归一化朝向误差 (heading_error_normalized): 1维
+  - 归一化距离 (distance_normalized): 1维
+  - 到达标志 (reached_flag): 1维
+  - 停止就绪标志 (stop_ready_flag): 1维
 - **动作空间维度**: 12维（对应12个关节执行器）
 
 #### 1.1.3 关键超参
@@ -103,7 +117,7 @@
 ```
 初始化环境
     ↓
-生成随机目标位置 (固定终点 Y=10.2m)
+固定终点为地图中心点，生成随机目标位置 (以地图中心点为圆心，有效起始距离为环形内半径的区域内)
     ↓
 观测获取 (54维) → Policy网络 → 动作输出 (12维)
     ↓
@@ -117,8 +131,8 @@ PPO更新
 ```
 
 **核心策略:**
-1. **固定目标训练**: 目标位置固定在Y=10.2m，让机器人专注于学习直线行走
-2. **小范围随机初始化**: 起始位置在±0.1m范围内随机，增加泛化能力
+1. **固定目标训练**: 目标位置固定在地图中心点，让机器人专注于学习直线行走
+2. **小范围随机初始化**: 起始位置在以地图中心点为圆心，有效起始距离为环形内半径的区域内随机，增加泛化能力
 3. **渐进式难度**: 从简单地形开始，逐步增加难度
 
 #### 1.2.2 终止条件
@@ -256,7 +270,7 @@ PPO更新
 
 **驻留点庆祝动作:**
 - 持续时间: 60步 (约1秒@60Hz)
-- 动作: 预定义的关节位置序列
+- 动作: 预定义的关节位置序列（机器狗四足一起小幅弯曲，作出蹲下动作）
 - 不影响RL控制，仅用于可视化
 
 ---
@@ -281,17 +295,17 @@ PPO更新
 
 **第一赛段训练:**
 ```bash
-python scripts/train.py --env MotrixArena_S1_section001_opendoge --num-envs 2048 --train-backend jax
+python scripts/train.py --env MotrixArena_S1_section001_opendoge
 ```
 
 **第二赛段训练:**
 ```bash
-python scripts/train.py --env MotrixArena_S1_section01_opendoge --num-envs 2048 --train-backend jax
+python scripts/train.py --env MotrixArena_S1_section01_opendoge
 ```
 
 **模型推理:**
 ```bash
-python scripts/play.py --env MotrixArena_S1_section001_opendoge --checkpoint runs/MotrixArena_S1_section001_opendoge/xx-xx-xx_PPO/checkpoints/agent_1000.pt
+python scripts/play.py --env MotrixArena_S1_section001_opendoge --checkpoint runs/MotrixArena_S1_section001_opendoge/xx-xx-xx_PPO/checkpoints/best_agent.pickle
 ```
 
 #### 权重下载说明
