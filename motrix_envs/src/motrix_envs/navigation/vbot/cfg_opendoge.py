@@ -169,7 +169,6 @@ class VBotStairsObstaclesEnvCfg(VBotStairsEnvCfg):
     max_episode_steps: int = 2000
 
 @registry.envcfg("vbot_navigation_section01")
-#通过 @registry.envcfg("vbot_navigation_section01") 注册
 @dataclass
 class VBotSection01EnvCfg(VBotStairsEnvCfg):
     """VBot Section01单独训练配置 - 高台楼梯地形"""
@@ -349,8 +348,8 @@ class VBotLongCourseEnvCfg(VBotStairsEnvCfg):
     commands: Commands = field(default_factory=Commands)
     control_config: ControlConfig = field(default_factory=ControlConfig)
 
-@registry.envcfg("vbot_navigation_section001")
-#通过 @registry.envcfg("vbot_navigation_section001") 注册
+# @registry.envcfg("vbot_navigation_section001")
+@registry.envcfg("MotrixArena_S1_section001_opendoge")
 @dataclass
 class VBotSection001EnvCfg(VBotStairsEnvCfg):
     """VBot Section001单独训练配置 - 平地地形"""
@@ -446,7 +445,6 @@ class VBotSection001EnvCfg(VBotStairsEnvCfg):
     asset: Asset = field(default_factory=Asset)
 
 @registry.envcfg("vbot_navigation_section011")
-#通过 @registry.envcfg("vbot_navigation_section011") 注册
 @dataclass
 class VBotSection011EnvCfg(VBotStairsEnvCfg):
     """VBot Section011单独训练配置 - 01地形"""
@@ -527,7 +525,6 @@ class VBotSection011EnvCfg(VBotStairsEnvCfg):
     asset: Asset = field(default_factory=Asset)
 
 @registry.envcfg("vbot_navigation_section012")
-#通过 @registry.envcfg("vbot_navigation_section012") 注册
 @dataclass
 class VBotSection012EnvCfg(VBotStairsEnvCfg):
     """VBot Section012单独训练配置 - 02地形"""
@@ -608,7 +605,6 @@ class VBotSection012EnvCfg(VBotStairsEnvCfg):
     asset: Asset = field(default_factory=Asset)
 
 @registry.envcfg("vbot_navigation_section013")
-#通过 @registry.envcfg("vbot_navigation_section013") 注册
 @dataclass
 class VBotSection013EnvCfg(VBotStairsEnvCfg):
     """VBot Section013单独训练配置 - 03地形"""
@@ -687,7 +683,6 @@ class VBotSection013EnvCfg(VBotStairsEnvCfg):
     asset: Asset = field(default_factory=Asset)
 
 @registry.envcfg("vbot_navigation_section002")
-#通过 @registry.envcfg("vbot_navigation_section002") 注册
 @dataclass
 class VBotSection002EnvCfg(VBotStairsEnvCfg):
     """VBot Section002全地形训练配置"""
@@ -767,7 +762,8 @@ class VBotSection002EnvCfg(VBotStairsEnvCfg):
     reward_config: RewardConfig = field(default_factory=RewardConfig)
     asset: Asset = field(default_factory=Asset)
 
-@registry.envcfg("vbot_navigation_section002_waypoint")
+# @registry.envcfg("vbot_navigation_section002_waypoint")
+@registry.envcfg("MotrixArena_S1_section01_opendoge")
 @dataclass
 class VBotSection002WaypointEnvCfg(VBotStairsEnvCfg):
     """VBot Section002全地形训练配置"""
@@ -788,7 +784,7 @@ class VBotSection002WaypointEnvCfg(VBotStairsEnvCfg):
         # ground_subtree = "C_"  # 地形根节点，用于subtree接触检测
         ground_subtree = "S1C_"  # 地形根节点，用于subtree接触检测
         # 支持多个地面子树前缀的列表，用于全地形接触检测
-        ground_subtree_prefixes = ["S1C_", "S2C_", "S3C_"]  # 全地形地面子树前缀
+        ground_subtree_prefixes = ["C1_", "C2_", "C3_"]  # 全地形地面子树前缀
         ground_name = "dixing"  # "diban"
         goal_name = ""  # 目标位置名称，注意要加S3V_这个前缀（在scene_section002_waypoint.xml中进行了定义）
         difficulty_mode = "hard-4"  # "simple", "easy", "normal", "hard-1", "hard-2", "hard-3", "hard-4"
@@ -851,13 +847,14 @@ class VBotSection002WaypointEnvCfg(VBotStairsEnvCfg):
                 {"name": "wp_1-5_body", "index": 5, "action": False},
                 {"name": "wp_1-4_body", "index": 6, "action": True},
                 {"name": "wp_2-8_body", "index": 7, "action": False},
-                {"name": "wp_2-10_body", "index": 8, "action": False},
-                {"name": "wp_2-5-1_body", "index": 9, "action": False},
-                {"name": "wp_2-5_body", "index": 10, "action": False},
-                {"name": "wp_2-5-2_body", "index": 11, "action": False},
-                {"name": "wp_2-9_body", "index": 12, "action": False},
-                {"name": "wp_2-1_body", "index": 13, "action": True},
-                {"name": "wp_3-1_body", "index": 14, "action": True}
+                {"name": "wp_2-12_body", "index": 8, "action": False},
+                {"name": "wp_2-10_body", "index": 9, "action": False},
+                {"name": "wp_2-5-1_body", "index": 10, "action": False},
+                {"name": "wp_2-5_body", "index": 11, "action": False},
+                # {"name": "wp_2-5-2_body", "index": 11, "action": False},
+                # {"name": "wp_2-9_body", "index": 12, "action": False},
+                {"name": "wp_2-1_body", "index": 12, "action": True},
+                {"name": "wp_3-1_body", "index": 13, "action": True}
             ],
             "hard-5": [  # 复杂,带20个途径点(不过吊桥,6个红包点),驻留点全部带庆祝动作
                 {"name": "wp_1-1_body", "index": 0, "action": False},
@@ -931,16 +928,16 @@ class VBotSection002WaypointEnvCfg(VBotStairsEnvCfg):
         pos_randomization_range = [-5.0, -5.0, 5.0, 5.0]  # X±5.0m, Y±5.0m随机
 
         default_joint_angles = {
-            "FR_hip_joint": -0.0,     # 右前髋关节
+            "FR_hip_joint": -0.1,     # 右前髋关节（加强向外展开，防止崎岖地形内收）
             "FR_thigh_joint": 0.95,   # 右前大腿（适中抬高）
             "FR_calf_joint": -1.85,   # 右前小腿
-            "FL_hip_joint": 0.0,      # 左前髋关节
+            "FL_hip_joint": 0.1,      # 左前髋关节（加强向外展开，防止崎岖地形内收）
             "FL_thigh_joint": 0.95,   # 左前大腿（适中抬高）
             "FL_calf_joint": -1.85,   # 左前小腿
-            "RR_hip_joint": -0.0,     # 右后髋关节
+            "RR_hip_joint": -0.1,     # 右后髋关节（加强向外展开，防止崎岖地形内收）
             "RR_thigh_joint": 0.85,   # 右后大腿（稍低提供推进力）
             "RR_calf_joint": -1.75,   # 右后小腿
-            "RL_hip_joint": 0.0,      # 左后髋关节
+            "RL_hip_joint": 0.1,      # 左后髋关节（加强向外展开，防止崎岖地形内收）
             "RL_thigh_joint": 0.85,   # 左后大腿（稍低提供推进力）
             "RL_calf_joint": -1.75,   # 左后小腿
         }
@@ -967,3 +964,9 @@ class VBotSection002WaypointEnvCfg(VBotStairsEnvCfg):
     noise_config: NoiseConfig = field(default_factory=NoiseConfig)
     reward_config: RewardConfig = field(default_factory=RewardConfig)
     asset: Asset = field(default_factory=Asset)
+
+# 必须包含以下环境配置
+env_configs = {
+    'MotrixArena_S1_section001_opendoge': "MotrixArena_S1_section001_opendoge",
+    'MotrixArena_S1_section01_opendoge': "MotrixArena_S1_section01_opendoge"
+}

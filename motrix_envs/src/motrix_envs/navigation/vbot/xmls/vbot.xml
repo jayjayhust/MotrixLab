@@ -827,14 +827,13 @@
     <framepos name="trunk_pos" objtype="site" objname="trunk_imu" />
     <framelinvel name="base_linvel" objtype="site" objname="trunk_imu" />
     
-    <!-- 楼梯地形专用传感器 -->
-    <!-- 足端位置传感器（用于边缘距离计算） -->
+    <!-- 足端位置传感器（新增：用于边缘距离计算） -->
     <framepos name="FR_foot_pos" objtype="body" objname="FR_foot" />
     <framepos name="FL_foot_pos" objtype="body" objname="FL_foot" />
     <framepos name="RR_foot_pos" objtype="body" objname="RR_foot" />
     <framepos name="RL_foot_pos" objtype="body" objname="RL_foot" />
     
-    <!-- 重力投影传感器（用于坡度检测） -->
+    <!-- 重力投影传感器（新增：用于坡度检测） -->
     <framezaxis name="gravity_projection" objtype="site" objname="trunk_imu" />
   </sensor>
 </mujoco>

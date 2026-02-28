@@ -21,7 +21,7 @@ from motrix_envs import registry
 from motrix_envs.np.env import NpEnv, NpEnvState
 from motrix_envs.math.quaternion import Quaternion
 
-from .cfg import VBotSection001EnvCfg
+from .cfg_opendoge import VBotSection001EnvCfg
 
 
 def generate_repeating_array(num_period, num_reset, period_counter):
@@ -37,7 +37,7 @@ def generate_repeating_array(num_period, num_reset, period_counter):
     return np.array(idx)
 
 
-@registry.env("vbot_navigation_section001", "np")
+@registry.env("MotrixArena_S1_section001_opendoge", "np")
 class VBotSection001Env(NpEnv):
     """
     VBot在Section001地形上的导航任务

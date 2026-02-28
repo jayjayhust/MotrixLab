@@ -329,7 +329,8 @@ class navigation:
         policy_hidden_layer_sizes: tuple[int, ...] = (512, 256, 128)
         value_hidden_layer_sizes: tuple[int, ...] = (512, 256, 128)
 
-    @rlcfg("vbot_navigation_section001")
+    # @rlcfg("vbot_navigation_section001")
+    @rlcfg("MotrixArena_S1_section001_opendoge")
     @dataclass
     class VbotNavSec001PPOConfig(PPOCfg):
         # ===== Basic Training Parameters =====
@@ -469,7 +470,8 @@ class navigation:
         policy_hidden_layer_sizes: tuple[int, ...] = (256, 128, 64)
         value_hidden_layer_sizes: tuple[int, ...] = (256, 128, 64)
 
-    @rlcfg("vbot_navigation_section002_waypoint")
+    # @rlcfg("vbot_navigation_section002_waypoint")
+    @rlcfg("MotrixArena_S1_section01_opendoge")
     @dataclass
     class VbotNavSec002WaypointPPOConfig(PPOCfg):
         # ===== Basic Training Parameters =====

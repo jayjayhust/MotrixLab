@@ -14,7 +14,7 @@
 # ==============================================================================
 
 # from . import vbot_np, vbot_stairs_np, vbot_stairs_multi_target_np, vbot_long_course_np, cfg # noqa: F401
-from . import vbot_section001_np, cfg # noqa: F401
+from . import vbot_section001_np, cfg_opendoge # noqa: F401
 from .vbot_section01_np import VBotSection01Env
 from .vbot_section001_np import VBotSection001Env
 from .vbot_section011_np import VBotSection011Env
@@ -30,5 +30,5 @@ from .vbot_np import VbotEnv
 # from .vbot_section01_np import VBotSection01Env
 # from .vbot_section02_np import VBotSection02Env
 # from .vbot_section03_np import VBotSection03Env
-from .cfg import VBotEnvCfg, VBotStairsEnvCfg, VBotSection01EnvCfg, VBotSection02EnvCfg, VBotSection03EnvCfg, VBotLongCourseEnvCfg
-from .cfg import VBotSection001EnvCfg, VBotSection011EnvCfg, VBotSection012EnvCfg, VBotSection013EnvCfg  # noqa: F401
+from .cfg_opendoge import VBotEnvCfg, VBotStairsEnvCfg, VBotSection01EnvCfg, VBotSection02EnvCfg, VBotSection03EnvCfg, VBotLongCourseEnvCfg
+from .cfg_opendoge import VBotSection001EnvCfg, VBotSection011EnvCfg, VBotSection012EnvCfg, VBotSection013EnvCfg  # noqa: F401

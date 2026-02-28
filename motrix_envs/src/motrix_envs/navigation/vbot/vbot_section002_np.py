@@ -21,7 +21,7 @@ from motrix_envs import registry
 from motrix_envs.np.env import NpEnv, NpEnvState
 from motrix_envs.math.quaternion import Quaternion
 
-from .cfg import VBotSection002EnvCfg
+from .cfg_opendoge import VBotSection002EnvCfg
 
 
 @registry.env("vbot_navigation_section002", "np")

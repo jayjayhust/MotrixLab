@@ -22,7 +22,7 @@ from motrix_envs import registry
 from motrix_envs.math.quaternion import Quaternion
 from motrix_envs.np.env import NpEnv, NpEnvState
 
-from .cfg import VBotEnvCfg
+from .cfg_opendoge import VBotEnvCfg
 
 def generate_repeating_array(num_period, num_reset, period_counter):
     """

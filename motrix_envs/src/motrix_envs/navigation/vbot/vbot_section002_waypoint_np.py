@@ -21,10 +21,10 @@ from motrix_envs import registry
 from motrix_envs.np.env import NpEnv, NpEnvState
 from motrix_envs.math.quaternion import Quaternion
 
-from .cfg import VBotSection002WaypointEnvCfg
+from .cfg_opendoge import VBotSection002WaypointEnvCfg
 
 
-@registry.env("vbot_navigation_section002_waypoint", "np")
+@registry.env("MotrixArena_S1_section01_opendoge", "np")
 class VBotSection002WaypointEnv(NpEnv):
     """
     VBot在Section002地形上的导航任务
@@ -161,6 +161,9 @@ class VBotSection002WaypointEnv(NpEnv):
         self._celebration_duration = 60  # About 1 second at 60Hz
         self._celebration_target_pos = np.zeros((self._num_envs, num_actuators), dtype=np.float32)
         self._celebration_start_pos = np.zeros((self._num_envs, num_actuators), dtype=np.float32)
+        
+        # --- Reached all waypoints state (per-env, persists until episode end) ---
+        self._reached_all = np.zeros(self._num_envs, dtype=bool)
 
         print(f"[Waypoint] Initialized {len(self.way_points)} waypoints (sorted by index)")
         for i, wp in enumerate(self.way_points):
@@ -834,9 +837,13 @@ class VBotSection002WaypointEnv(NpEnv):
                 len(self.visited_waypoints[i]) >= len(self.way_points)
                 for i in range(num_envs)
             ], dtype=bool)
-            reached_all = reached_position & all_waypoints_visited
+            newly_reached_all = reached_position & all_waypoints_visited
         else:
-            reached_all = reached_position
+            newly_reached_all = reached_position
+        
+        # 使用OR操作保持reached_all状态直到episode结束
+        self._reached_all = np.logical_or(self._reached_all, newly_reached_all)
+        reached_all = self._reached_all
         
         # 计算期望速度命令（降低速度优先稳定性）
         desired_vel_xy = np.clip(position_error * 0.8, -0.6, 0.6)  # 降低最大速度1.0→0.6
@@ -1240,14 +1247,18 @@ class VBotSection002WaypointEnv(NpEnv):
         heading_threshold = np.deg2rad(15)
         reached_heading = np.abs(heading_diff) < heading_threshold
         # reached_all = np.logical_and(reached_position, reached_heading)
-        reached_all = reached_position
+        newly_reached_all = reached_position
         # reached_all只在到达最后一个路径点时才置位
         if len(self.way_points) > 0:
             all_waypoints_visited = np.array([
                 len(self.visited_waypoints[i]) >= len(self.way_points)
                 for i in range(self._num_envs)
             ], dtype=bool)
-            reached_all = reached_all & all_waypoints_visited
+            newly_reached_all = newly_reached_all & all_waypoints_visited
+        
+        # 使用OR操作保持reached_all状态直到episode结束
+        self._reached_all = np.logical_or(self._reached_all, newly_reached_all)
+        reached_all = self._reached_all
         
         # 首次到达位置的一次性奖励
         info["ever_reached"] = info.get("ever_reached", np.zeros(self._num_envs, dtype=bool))
@@ -1298,37 +1309,17 @@ class VBotSection002WaypointEnv(NpEnv):
         joint_vel = self.get_dof_vel(data)
         dof_vel_penalty = np.sum(np.square(np.clip(joint_vel, -self._cfg.max_dof_vel, self._cfg.max_dof_vel) * self._cfg.normalization.dof_vel), axis=1)
         
-        # 动作变化惩罚
+        # 动作变化惩罚 - 保守模式：强化动作变化惩罚以防止摔倒
         action_diff = info["current_actions"] - info["last_actions"]
         action_rate_penalty = np.sum(np.square(action_diff), axis=1)
         
-        # ===== 陡峭楼梯区域检测 (wp_1-4 到 wp_2-2 之间) =====
-        # 检测机器人是否在陡峭楼梯区域: Y位置在8~15m之间，且有上坡趋势
-        robot_y = robot_position[:, 1]
-        vertical_vel = slope_features['vertical_velocity']
-        in_steep_stair_zone = np.logical_and(
-            np.logical_and(robot_y > 7.5, robot_y < 15.5),  # Y位置在陡峭区域
-            vertical_vel > -0.2  # 有上坡或平地趋势（允许小幅下坡波动）
-        )
-        
-        # 陡峭楼梯区域: 适度降低动作变化惩罚（保守版）
-        steep_stair_action_rate_scale = np.where(in_steep_stair_zone, 0.5, 1.0)  # 陡峭区域惩罚降低到50%
-        action_rate_penalty = action_rate_penalty * steep_stair_action_rate_scale
-        
-        # 陡峭楼梯区域: 大动作奖励（保守版）
+        # 动作幅度惩罚 - 保守模式：惩罚大幅度动作
         action_magnitude = np.sum(np.square(info["current_actions"]), axis=1)
-        large_action_bonus = np.where(
-            in_steep_stair_zone,
-            np.clip(action_magnitude * 0.2, 0, 1.0),  # 动作幅度奖励，上限1.0
-            0.0
-        )
+        action_magnitude_penalty = action_magnitude  # 直接作为惩罚项，无奖励
         
-        # 陡峭楼梯区域: 高度增益奖励（保守版）
-        height_gain_bonus = np.where(
-            in_steep_stair_zone,
-            np.clip(vertical_vel * 1.5, 0, 1.0),  # 向上速度奖励，上限1.0
-            0.0
-        )
+        # 陡峭楼梯区域相关逻辑已移除 - 现在使用保守参数
+        large_action_bonus = 0.0  # 不再鼓励大动作
+        height_gain_bonus = 0.0   # 不再单独奖励高度增益
         
         # ===== 新增：前进方向奖励机制 =====
         # 鼓励机器人正面朝向运动方向，防止侧身或倒着走
@@ -1502,7 +1493,8 @@ class VBotSection002WaypointEnv(NpEnv):
                 - 0.0 * orientation_penalty
                 - 0.00001 * torque_penalty
                 - 0.0 * dof_vel_penalty
-                - 0.001 * action_rate_penalty   # 到达后也限制动作幅度
+                - 0.003 * action_rate_penalty   # 保守模式：到达后也限制动作幅度（0.001→0.003）
+                - 0.0005 * action_magnitude_penalty  # 保守模式：到达后限制动作幅度
                 - 0.3 * gait_symmetry_penalty   # 到达后也维持步态对称性
                 - 0.1 * leg_air_time_penalty    # 极端滠空惩罚
                 + termination_penalty
@@ -1526,14 +1518,13 @@ class VBotSection002WaypointEnv(NpEnv):
                 + stair_climb_incentive          # 楼梯攀登激励奖励
                 + downhill_incentive             # 下坡激励奖励
                 + downhill_stability             # 下坡稳定性奖励
-                + large_action_bonus             # 陡峻楼梯大动作奖励
-                + height_gain_bonus              # 陡峻楼梯高度增益奖励
                 - 0.2 * lin_vel_z_penalty    # Z轴惩罚（提高，防止跳跃摔倒）
                 - 0.03 * ang_vel_xy_penalty  # XY角速度惩罚（提高，防止摇晃）
                 - 0.0 * orientation_penalty
                 - 0.00001 * torque_penalty
                 - 0.0 * dof_vel_penalty
-                - 0.002 * action_rate_penalty   # 增加动作变化惩罚，抑制动作过大
+                - 0.005 * action_rate_penalty   # 保守模式：大幅提高动作变化惩罚（0.002→0.005）
+                - 0.001 * action_magnitude_penalty  # 保守模式：新增动作幅度惩罚
                 - 0.4 * gait_symmetry_penalty    # 步态对称性惩罚（降低0.8→0.4）
                 - 0.2 * leg_air_time_penalty     # 极端滠空惩罚（降低）
                 + termination_penalty
@@ -1558,12 +1549,10 @@ class VBotSection002WaypointEnv(NpEnv):
             edge_dist_mean = float(np.mean(foot_edge_distance))
             dyn_stab_mean = float(np.mean(dyn_stability_reward))
             
-            # 陡峭楼梯区域统计
-            steep_zone_count = int(in_steep_stair_zone.sum())
-            large_action_bonus_mean = float(np.mean(large_action_bonus))
-            height_gain_bonus_mean = float(np.mean(height_gain_bonus))
-            if steep_zone_count > 0:
-                print(f"[steep_stair] envs={steep_zone_count}/{total_envs}, action_bonus={large_action_bonus_mean:.3f}, height_bonus={height_gain_bonus_mean:.3f}")
+            # 动作幅度统计（保守模式调试）
+            action_mag_mean = float(np.mean(action_magnitude))
+            action_rate_mean = float(np.mean(action_rate_penalty))
+            print(f"[action] magnitude={action_mag_mean:.3f} rate_penalty={action_rate_mean:.3f} (conservative mode)")
             
             # 添加NaN检查和处理
             if np.any(np.isnan(distance_to_target)):
@@ -1628,6 +1617,9 @@ class VBotSection002WaypointEnv(NpEnv):
         # Reset celebration state for done envs only
         self._celebration_active[done_indices] = False
         self._celebration_step[done_indices] = 0
+        
+        # Reset reached_all state for done envs only
+        self._reached_all[done_indices] = False
 
         # Call parent to handle standard reset (obs, info, physics)
         super()._reset_done_envs()

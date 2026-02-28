@@ -13,4 +13,4 @@
 # limitations under the License.
 # ==============================================================================
 
-from . import cfgs, skrl  # noqa: F401
+from . import cfgs_opendoge, skrl  # noqa: F401
