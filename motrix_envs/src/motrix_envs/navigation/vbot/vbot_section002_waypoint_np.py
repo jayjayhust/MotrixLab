@@ -96,7 +96,93 @@ class VBotSection002WaypointEnv(NpEnv):
     
         # 导航统计计数器
         self.navigation_stats_step = 0
+        
+        # 初始化卡困检测系统
+        self._init_stuck_detection()
     
+    def _init_stuck_detection(self):
+        """初始化卡困检测系统：检测机器人在长时间内没有明显位姿变化的情况"""
+        # 卡困检测参数
+        self._stuck_check_window = 480  # 检测窗口：480步（8秒@60Hz）
+        self._stuck_pos_threshold = 0.15  # 位置变化阈值：480步内移动小于0.15米视为卡困
+        self._stuck_rot_threshold = np.deg2rad(15)  # 旋转变化阈值：480步内旋转小于15度视为卡困
+        
+        # 历史位置记录 (环形缓冲区)
+        self._stuck_pos_history = np.zeros((self._num_envs, self._stuck_check_window, 3), dtype=np.float32)
+        self._stuck_yaw_history = np.zeros((self._num_envs, self._stuck_check_window), dtype=np.float32)
+        self._stuck_history_idx = np.zeros(self._num_envs, dtype=np.int32)  # 当前写入位置
+        self._stuck_history_filled = np.zeros(self._num_envs, dtype=bool)  # 缓冲区是否已填满
+        
+        # 卡困状态
+        self._stuck_detected = np.zeros(self._num_envs, dtype=bool)
+        self._stuck_consecutive_count = np.zeros(self._num_envs, dtype=np.int32)  # 连续检测到卡困的步数
+        self._stuck_terminate_threshold = 240  # 连续240步（4秒）检测到卡困后终止
+    
+    def _update_stuck_detection(self, root_pos: np.ndarray, root_quat: np.ndarray):
+        """
+        更新卡困检测状态
+        
+        Args:
+            root_pos: [num_envs, 3] 机器人位置
+            root_quat: [num_envs, 4] 机器人四元数
+        """
+        num_envs = root_pos.shape[0]
+        
+        # 计算yaw角
+        yaw = self._get_heading_from_quat(root_quat)
+        
+        for env_idx in range(num_envs):
+            idx = self._stuck_history_idx[env_idx]
+            
+            # 记录当前位置
+            self._stuck_pos_history[env_idx, idx] = root_pos[env_idx]
+            self._stuck_yaw_history[env_idx, idx] = yaw[env_idx]
+            
+            # 更新索引
+            self._stuck_history_idx[env_idx] = (idx + 1) % self._stuck_check_window
+            
+            # 检查缓冲区是否已填满
+            if not self._stuck_history_filled[env_idx] and self._stuck_history_idx[env_idx] == 0:
+                self._stuck_history_filled[env_idx] = True
+            
+            # 只有当缓冲区填满后才进行卡困检测
+            if self._stuck_history_filled[env_idx]:
+                # 计算窗口内的位置变化
+                positions = self._stuck_pos_history[env_idx]
+                pos_diff = np.max(np.linalg.norm(positions - root_pos[env_idx], axis=1))
+                
+                # 计算窗口内的旋转变化（考虑角度环绕）
+                yaws = self._stuck_yaw_history[env_idx]
+                yaw_diffs = np.abs(np.arctan2(np.sin(yaws - yaw[env_idx]), np.cos(yaws - yaw[env_idx])))
+                yaw_diff = np.max(yaw_diffs)
+                
+                # 判断是否卡困：位置和旋转变化都小于阈值
+                is_stuck = (pos_diff < self._stuck_pos_threshold) and (yaw_diff < self._stuck_rot_threshold)
+                
+                if is_stuck:
+                    self._stuck_consecutive_count[env_idx] += 1
+                else:
+                    self._stuck_consecutive_count[env_idx] = 0
+                    self._stuck_detected[env_idx] = False
+                
+                # 连续检测到卡困达到阈值
+                if self._stuck_consecutive_count[env_idx] >= self._stuck_terminate_threshold:
+                    self._stuck_detected[env_idx] = True
+    
+    def _reset_stuck_detection(self, env_mask: np.ndarray):
+        """
+        重置指定环境的卡困检测状态
+        
+        Args:
+            env_mask: [num_envs] bool数组，True表示需要重置的环境
+        """
+        self._stuck_pos_history[env_mask] = 0
+        self._stuck_yaw_history[env_mask] = 0
+        self._stuck_history_idx[env_mask] = 0
+        self._stuck_history_filled[env_mask] = False
+        self._stuck_detected[env_mask] = False
+        self._stuck_consecutive_count[env_mask] = 0
+
     def _init_buffer(self):
         """初始化缓存和参数"""
         cfg = self._cfg
@@ -772,6 +858,10 @@ class VBotSection002WaypointEnv(NpEnv):
         
         # 获取基础状态
         root_pos, root_quat, root_vel = self._extract_root_state(data)
+        
+        # 更新卡困检测
+        self._update_stuck_detection(root_pos, root_quat)
+        
         joint_pos = self.get_dof_pos(data)
         joint_vel = self.get_dof_vel(data)
         joint_pos_rel = joint_pos - self.default_angles
@@ -1026,15 +1116,20 @@ class VBotSection002WaypointEnv(NpEnv):
         rollover_mask = tilt_angle > dynamic_threshold
         terminated = np.logical_or(terminated, rollover_mask)
 
+        # 卡困终止：长时间位姿无明显变化
+        stuck_mask = self._stuck_detected.copy()
+        terminated = np.logical_or(terminated, stuck_mask)
+
         # 调试：统计终止原因
         if terminated.any():
             timeout_count = int(timeout.sum())
             contact_count = int(base_contact.sum())
             gyro_abnormal_count = int(large_values.sum())
             rollover_count = int(rollover_mask.sum())
+            stuck_count = int(stuck_mask.sum())
             total = int(terminated.sum())
             if total > 0 and state.info["steps"][0] % 100 == 0:  # 每100步打印一次
-                print(f"[termination] total={total} timeout={timeout_count} contact={contact_count} gyro={gyro_abnormal_count} x_oob={x_oob_count} rollover={rollover_count}")
+                print(f"[termination] total={total} timeout={timeout_count} contact={contact_count} gyro={gyro_abnormal_count} x_oob={x_oob_count} rollover={rollover_count} stuck={stuck_count}")
                 pass
         
         return state.replace(terminated=terminated)
@@ -1620,6 +1715,9 @@ class VBotSection002WaypointEnv(NpEnv):
         
         # Reset reached_all state for done envs only
         self._reached_all[done_indices] = False
+        
+        # Reset stuck detection for done envs only
+        self._reset_stuck_detection(done_indices)
 
         # Call parent to handle standard reset (obs, info, physics)
         super()._reset_done_envs()

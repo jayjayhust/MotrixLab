@@ -850,11 +850,11 @@ class VBotSection002WaypointEnvCfg(VBotStairsEnvCfg):
                 {"name": "wp_2-12_body", "index": 8, "action": False},
                 {"name": "wp_2-10_body", "index": 9, "action": False},
                 {"name": "wp_2-5-1_body", "index": 10, "action": False},
-                {"name": "wp_2-5_body", "index": 11, "action": False},
+                # {"name": "wp_2-5_body", "index": 11, "action": False},
                 # {"name": "wp_2-5-2_body", "index": 11, "action": False},
                 # {"name": "wp_2-9_body", "index": 12, "action": False},
-                {"name": "wp_2-1_body", "index": 12, "action": True},
-                {"name": "wp_3-1_body", "index": 13, "action": True}
+                {"name": "wp_2-1_body", "index": 11, "action": True},
+                {"name": "wp_3-1_body", "index": 12, "action": True}
             ],
             "hard-5": [  # 复杂,带20个途径点(不过吊桥,6个红包点),驻留点全部带庆祝动作
                 {"name": "wp_1-1_body", "index": 0, "action": False},

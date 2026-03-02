@@ -21,7 +21,6 @@
     
     <!-- 加载section01地形模型  -->
     <model name="section01C" file="0126_C_section01.xml"/>
-    <!-- <model name="section01C" file="0131_C_section01.xml"/> -->
     <model name="section01V" file="0202_V_section01.xml"/>
     
     <!-- 加载section02地形模型 - 使用0126版本 -->
