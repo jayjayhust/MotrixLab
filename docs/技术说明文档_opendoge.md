@@ -74,12 +74,15 @@
 **第二赛段 (Section01) 奖励设计:**
 
 在Section001基础上增加了保守模式调整：
-- 提高动作变化惩罚权重（0.002→0.005）
-- 新增动作幅度惩罚（0.001）
-- 增加接地奖励（0.15）
-- 降低步态对称性惩罚（0.8→0.4）
-- 新增极端滞空惩罚（0.2）
-- 移除陡峭楼梯区域的大动作奖励
+
+| 调整项 | 变量名 | 原始值 | 调整后 | 说明 |
+|-------|--------|-------|-------|------|
+| 动作变化惩罚权重 | action_rate_penalty | 0.002 | 0.005 | 提高惩罚，减少动作震荡 |
+| 动作幅度惩罚 | action_magnitude_penalty | 无 | 0.001 | 新增惩罚，限制大动作 |
+| 接地奖励 | ground_contact_reward | 无 | 0.15 | 新增奖励，鼓励稳定接触地面 |
+| 步态对称性惩罚 | gait_symmetry_penalty | 0.8 | 0.4 | 降低惩罚，允许更灵活的步态 |
+| 极端滞空惩罚 | leg_air_time_penalty | 无 | 0.2 | 新增惩罚，防止长时间离地 |
+| 陡峭楼梯大动作奖励 | steep_stair_action_rate_scale | 有 | 移除 | 移除奖励，避免冒险行为 |
 
 #### 1.1.5 文件说明
 
@@ -346,7 +349,7 @@ uv run scripts/train.py --env MotrixArena_S1_section01_opendoge
 
 **模型推理:**
 ```bash
-uv run scripts/play.py --env MotrixArena_S1_section001_opendoge --checkpoint runs/MotrixArena_S1_section001_opendoge/xx-xx-xx_PPO/checkpoints/best_agent.pickle
+uv run scripts/play.py --env MotrixArena_S1_section001_opendoge --num-envs 10 --checkpoint runs/MotrixArena_S1_section001_opendoge/xx-xx-xx_PPO/checkpoints/best_agent.pickle
 uv run scripts/play.py --env MotrixArena_S1_section01_opendoge --num-envs 10
 ```
 
@@ -361,13 +364,13 @@ uv run scripts/play.py --env MotrixArena_S1_section01_opendoge --num-envs 10
 #### 训练结果
 
 **第一赛段 (Section001):**
-- 训练步数: ~50M steps
+- 训练步数: ~50M steps(max_env_steps = 100_000_000 (100M), Total steps = num_envs (2048) × steps_per_env × iterations = 2048 × 4000 × ~6 (Section001). Iterations = 100M / (2048 × 4000) ≈ 12 iterations, Estimated iterations to convergence: ~6)
 - 成功率: >95%
 - 平均奖励: ~22
 - 到达时间: ~15-20秒
 
 **第二赛段 (Section01):**
-- 训练步数: ~80M steps
+- 训练步数: ~80M steps(max_env_steps = 100_000_000 (100M), Total steps = num_envs (2048) × steps_per_env × iterations = 2048 × 12000 × ~3 (Section001). Iterations = 100M / (2048 × 12000) ≈ 4 iterations. Estimated iterations to convergence: ~3)
 - 成功率: ~70%
 - 平均奖励: ~76
 - 完成时间: ~100-120秒
