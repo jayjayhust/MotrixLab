@@ -1728,15 +1728,15 @@ class VBotSection002WaypointEnv(NpEnv):
         
         # 在高台中央小范围内随机生成位置
         # 方法1(用于训练):X, Y: 在spawn_center周围 ±spawn_range 范围内随机
-        random_xy = np.random.uniform(
-            low=-self.spawn_range,
-            high=self.spawn_range,
-            size=(num_envs, 2)
-        )
+        # random_xy = np.random.uniform(
+        #     low=-self.spawn_range,
+        #     high=self.spawn_range,
+        #     size=(num_envs, 2)
+        # )
         # 方法2(用于测试):X: -2.5~2.5, Y: -0.5~0.5
-        # random_x = np.random.uniform(low=-2.5, high=2.5, size=(num_envs, 1))
-        # random_y = np.random.uniform(low=-0.5, high=0.5, size=(num_envs, 1))
-        # random_xy = np.hstack([random_x, random_y])
+        random_x = np.random.uniform(low=-2.5, high=2.5, size=(num_envs, 1))
+        random_y = np.random.uniform(low=-0.5, high=0.5, size=(num_envs, 1))
+        random_xy = np.hstack([random_x, random_y])
         robot_init_xy = self.spawn_center[:2] + random_xy  # [num_envs, 2]
         terrain_heights = np.full(num_envs, self.spawn_center[2], dtype=np.float32)  # 使用配置的高度
         

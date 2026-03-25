@@ -6,6 +6,7 @@
 - [ppo.py](file://motrix_rl/src/motrix_rl/skrl/torch/train/ppo.py)
 - [cfg.py](file://motrix_rl/src/motrix_rl/skrl/cfg.py)
 - [cfgs.py](file://motrix_rl/src/motrix_rl/cfgs.py)
+- [cfgs_opendoge.py](file://motrix_rl/src/motrix_rl/cfgs_opendoge.py)
 - [wrap_np.py](file://motrix_rl/src/motrix_rl/skrl/jax/wrap_np.py)
 - [wrap_np.py](file://motrix_rl/src/motrix_rl/skrl/torch/wrap_np.py)
 - [env.py](file://motrix_envs/src/motrix_envs/np/env.py)
@@ -13,6 +14,7 @@
 - [cfg.py](file://motrix_envs/src/motrix_envs/locomotion/go1/cfg.py)
 - [cfg.py](file://motrix_envs/src/motrix_envs/manipulation/franka_lift_cube/cfg.py)
 - [cfg.py](file://motrix_envs/src/motrix_envs/navigation/vbot/cfg.py)
+- [cfg_opendoge.py](file://motrix_envs/src/motrix_envs/navigation/vbot/cfg_opendoge.py)
 - [utils.py](file://motrix_rl/src/motrix_rl/utils.py)
 - [train.py](file://scripts/train.py)
 - [registry.py](file://motrix_rl/src/motrix_rl/registry.py)
@@ -20,10 +22,11 @@
 
 ## Update Summary
 **Changes Made**
-- Enhanced VBot navigation training configurations with specialized hyperparameters for complex locomotion tasks
-- Added dedicated PPO training configurations for VBot sections 002, 012, and 013 with optimized learning rates and rollout lengths
-- Updated environment-specific configuration examples to include new section-specific training setups
-- Documented advanced network architectures and gradient clipping strategies for challenging navigation terrains
+- Added comprehensive OpenDoge training configurations for MotrixArena S1 competition
+- Enhanced VBot navigation training setups with specialized hyperparameters for complex locomotion tasks
+- Integrated advanced reward shaping techniques for path-point navigation and terrain adaptation
+- Documented specialized training configurations for sections 001, 01, 011, 012, 013, and 002
+- Added detailed environment-specific configurations with terrain complexity and waypoint systems
 
 ## Table of Contents
 1. [Introduction](#introduction)
@@ -40,7 +43,7 @@
 ## Introduction
 This document provides a comprehensive guide to the Proximal Policy Optimization (PPO) training implementation in the MotrixLab-S1 project. It explains how PPO is implemented for both JAX and PyTorch backends, detailing computational graph differences, gradient computation, and optimization strategies. It covers the training loop structure, policy/value network updates, advantage estimation, and backend-specific optimizations such as JIT compilation for JAX and GPU utilization for PyTorch. It also documents training configuration parameters, hyperparameter tuning guidelines, convergence criteria, practical training setup, checkpoint management, performance monitoring, integration with MotrixSim physics environments, reward shaping techniques, and episode termination conditions.
 
-**Updated** Enhanced with specialized VBot navigation training configurations featuring optimized hyperparameters for complex locomotion tasks across sections 002, 012, and 013, including advanced gradient clipping strategies and high-throughput training setups.
+**Updated** Enhanced with comprehensive OpenDoge training configurations for MotrixArena S1 competition, featuring specialized VBot navigation training setups with optimized hyperparameters for complex locomotion tasks across multiple sections with advanced reward shaping and terrain adaptation strategies.
 
 ## Project Structure
 The PPO implementation is organized around a backend-agnostic configuration system and backend-specific trainers and wrappers. The key components are:
@@ -48,6 +51,7 @@ The PPO implementation is organized around a backend-agnostic configuration syst
 - Backend-specific PPO trainers that construct policy/value models, configure agents, and orchestrate training
 - Environment wrappers that adapt NumPy-based physics environments to SKRL-compatible interfaces
 - Environment configurations that define physics parameters, reward functions, and termination conditions
+- OpenDoge-specific training configurations for MotrixArena competition scenarios
 
 ```mermaid
 graph TB
@@ -57,7 +61,8 @@ end
 subgraph "RL Configuration"
 BC["motrix_rl/base.py<br/>BaseRLCfg"]
 PC["motrix_rl/skrl/cfg.py<br/>PPOCfg"]
-GC["motrix_rl/cfgs.py<br/>Environment-specific PPO configs"]
+GC["motrix_rl/cfgs.py<br/>Standard PPO configs"]
+ODC["motrix_rl/cfgs_opendoge.py<br/>OpenDoge PPO configs"]
 end
 subgraph "JAX Backend"
 JP["motrix_rl/skrl/jax/train/ppo.py<br/>JAX PPO Trainer"]
@@ -73,6 +78,7 @@ RC["motrix_envs/np/reward.py<br/>Reward Functions"]
 EC1["motrix_envs/locomotion/go1/cfg.py<br/>Go1 Config"]
 EC2["motrix_envs/manipulation/franka_lift_cube/cfg.py<br/>Franka Config"]
 EC3["motrix_envs/navigation/vbot/cfg.py<br/>VBot Navigation Configs"]
+EC4["motrix_envs/navigation/vbot/cfg_opendoge.py<br/>OpenDoge VBot Configs"]
 end
 T --> JP
 T --> TP
@@ -82,7 +88,9 @@ JW --> NE
 TW --> NE
 NE --> RC
 GC --> PC
+ODC --> PC
 PC --> BC
+EC4 --> ODC
 EC3 --> GC
 ```
 
@@ -95,36 +103,43 @@ EC3 --> GC
 - [env.py](file://motrix_envs/src/motrix_envs/np/env.py#L52-L209)
 - [cfg.py](file://motrix_rl/src/motrix_rl/skrl/cfg.py#L28-L74)
 - [cfgs.py](file://motrix_rl/src/motrix_rl/cfgs.py#L22-L416)
+- [cfgs_opendoge.py](file://motrix_rl/src/motrix_rl/cfgs_opendoge.py#L333-L471)
 - [cfg.py](file://motrix_envs/src/motrix_envs/locomotion/go1/cfg.py#L122-L188)
 - [cfg.py](file://motrix_envs/src/motrix_envs/manipulation/franka_lift_cube/cfg.py#L69-L84)
-- [cfg.py](file://motrix_envs/src/motrix_envs/navigation/vbot/cfg.py#L430-L684)
+- [cfg_opendoge.py](file://motrix_envs/src/motrix_envs/navigation/vbot/cfg_opendoge.py#L352-L972)
 
 **Section sources**
 - [train.py](file://scripts/train.py#L52-L91)
 - [cfg.py](file://motrix_rl/src/motrix_rl/skrl/cfg.py#L28-L74)
 - [cfgs.py](file://motrix_rl/src/motrix_rl/cfgs.py#L22-L416)
+- [cfgs_opendoge.py](file://motrix_rl/src/motrix_rl/cfgs_opendoge.py#L333-L471)
 
 ## Core Components
 - PPO configuration classes define hyperparameters such as network sizes, rollout length, learning epochs, mini-batch count, discount factor, lambda for GAE, learning rate scheduling, gradient norm clipping, clipping thresholds, loss scaling factors, and reward shaping parameters.
 - Environment-specific PPO configurations override defaults for different tasks (e.g., cartpole, bounce ball, DM control tasks, locomotion, manipulation, navigation).
 - Backend-specific trainers construct policy/value models, configure agents, set up memory, and run the training loop.
 - Environment wrappers adapt NumPy-based physics environments to SKRL-compatible interfaces, handling observation/action spaces, rendering, and stepping semantics.
+- OpenDoge-specific configurations provide specialized training setups for MotrixArena competition scenarios with advanced reward shaping and terrain adaptation.
 
-**Updated** Enhanced with specialized VBot navigation configurations featuring optimized hyperparameters for complex terrain navigation:
-- **VBot Section 002**: Advanced configuration with 2048 parallel environments, 48 rollouts, 6 learning epochs, and 32 mini-batches
-- **VBot Section 012**: Complex terrain configuration with identical hyperparameters optimized for challenging navigation scenarios
-- **VBot Section 013**: Final section configuration with specialized reward shaping and termination conditions
+**Updated** Enhanced with comprehensive OpenDoge training configurations featuring specialized VBot navigation training setups:
+- **Section 001 (Flat Terrain)**: Basic navigation training with fixed targets and random initialization
+- **Section 01 (Full Terrain)**: Advanced path-point navigation with 14 waypoints and adaptive PD controllers
+- **Sections 011, 012, 013**: Individual section training for complex terrain navigation
+- **Section 002 (Full Terrain)**: Comprehensive terrain training with 60-second episodes and 6000-step maximum
+- **Advanced Reward Shaping**: Enhanced reward functions with position tracking, fine position tracking, heading tracking, and forward velocity components
 
 Key responsibilities:
-- Hyperparameter management: centralized in PPOCfg and environment-specific overrides
+- Hyperparameter management: centralized in PPOCfg and environment-specific overrides including OpenDoge configurations
 - Model construction: backend-specific model classes for policy/value networks
 - Agent configuration: mapping PPOCfg to SKRL agent configuration
 - Training orchestration: sequential trainer loop with memory replay and logging/checkpointing
 - Environment integration: wrapping NumPy physics environments for SKRL
+- Competition-specific adaptations: path-point navigation, terrain adaptation, and reward shaping
 
 **Section sources**
 - [cfg.py](file://motrix_rl/src/motrix_rl/skrl/cfg.py#L28-L74)
 - [cfgs.py](file://motrix_rl/src/motrix_rl/cfgs.py#L22-L416)
+- [cfgs_opendoge.py](file://motrix_rl/src/motrix_rl/cfgs_opendoge.py#L333-L471)
 - [ppo.py](file://motrix_rl/src/motrix_rl/skrl/jax/train/ppo.py#L87-L143)
 - [ppo.py](file://motrix_rl/src/motrix_rl/skrl/torch/train/ppo.py#L86-L143)
 - [wrap_np.py](file://motrix_rl/src/motrix_rl/skrl/jax/wrap_np.py#L27-L81)
@@ -323,18 +338,26 @@ Core PPO hyperparameters defined in PPOCfg:
 - Reward shaping: rewards_shaper_scale
 - Environment integration: time_limit_bootstrap
 
-**Updated** Enhanced with specialized VBot navigation configurations featuring optimized hyperparameters for complex terrain navigation:
+**Updated** Enhanced with comprehensive OpenDoge training configurations featuring specialized VBot navigation setups:
 
-**VBot Navigation Section Configurations**:
-- **Section 002**: Advanced configuration with 2048 parallel environments, 48 rollouts, 6 learning epochs, 32 mini-batches, and 1.0 gradient clipping optimized for complex navigation terrains
-- **Section 012**: Identical hyperparameters to section 002, specifically tuned for challenging navigation scenarios with complex geometry
-- **Section 013**: Final section configuration with optimized reward shaping and termination conditions for finishing navigation tasks
+**OpenDoge Competition Configurations**:
+- **Section 001 (Flat Terrain)**: Basic navigation with fixed targets, 40-second episodes, and 4000-step maximum
+- **Section 01 (Full Terrain)**: Advanced path-point navigation with 14 waypoints, 120-second episodes, and 12000-step maximum
+- **Sections 011, 012, 013**: Individual section training with specialized terrain configurations
+- **Section 002 (Full Terrain)**: Comprehensive terrain training with 60-second episodes and 6000-step maximum
 
 **Enhanced Performance Characteristics**:
 - **High-throughput training**: 2048 parallel environments enable rapid exploration of complex navigation terrains
 - **Balanced batch processing**: 48 rollouts with 32 mini-batches provide optimal compute efficiency for complex tasks
 - **Gradient stability**: 1.0 gradient clipping prevents divergence in challenging navigation scenarios
 - **Memory management**: Specialized configurations for section 002/012/013 terrain complexity
+- **Advanced reward shaping**: Enhanced reward functions with position tracking, fine position tracking, heading tracking, and forward velocity components
+
+**Competition-Specific Features**:
+- **Path-point navigation**: Systematic waypoint tracking with contact sensor detection
+- **Terrain adaptation**: Adaptive PD controller parameters for different terrain types
+- **Difficulty modes**: Multiple difficulty levels (simple, easy, normal, hard-1 to hard-6) with varying waypoint complexity
+- **Conservative training**: Increased safety measures for complex terrain navigation
 
 Guidelines:
 - Increase num_envs for stability and faster exploration; monitor throughput and memory usage.
@@ -346,7 +369,8 @@ Guidelines:
 **Section sources**
 - [cfg.py](file://motrix_rl/src/motrix_rl/skrl/cfg.py#L28-L74)
 - [cfgs.py](file://motrix_rl/src/motrix_rl/cfgs.py#L22-L416)
-- [cfgs.py](file://motrix_rl/src/motrix_rl/cfgs.py#L418-L444)
+- [cfgs_opendoge.py](file://motrix_rl/src/motrix_rl/cfgs_opendoge.py#L333-L471)
+- [cfgs_opendoge.py](file://motrix_rl/src/motrix_rl/cfgs_opendoge.py#L474-L500)
 
 ### Convergence Criteria and Monitoring
 - Convergence is typically assessed via reward curves, policy entropy, and KL divergence metrics tracked by the agent.
@@ -386,11 +410,14 @@ Guidelines:
 
 **Updated** Enhanced VBot navigation environment configurations with specialized terrain models and reward shaping:
 
-**VBot Navigation Environment Enhancements**:
-- **Section 002**: Full terrain training configuration with 60-second episodes and 6000-step maximum for comprehensive terrain coverage
-- **Section 012**: Complex terrain configuration with specialized asset handling for challenging navigation scenarios
-- **Section 013**: Final section configuration with optimized waypoint tracking and goal detection
+**OpenDoge Competition Environment Enhancements**:
+- **Section 001**: Flat terrain training with fixed targets and random initialization
+- **Section 01**: Full terrain training with 14-waypoint path-point navigation system
+- **Sections 011, 012, 013**: Individual section training with specialized terrain configurations
+- **Section 002**: Comprehensive terrain training with 60-second episodes and 6000-step maximum
 - **Advanced Reward Shaping**: Enhanced reward functions with position tracking, fine position tracking, heading tracking, and forward velocity components
+- **Path-point System**: Contact sensor-based waypoint detection with configurable difficulty modes
+- **Terrain Adaptation**: Adaptive PD controller parameters for different terrain types (flat, stairs, obstacles)
 
 **Section sources**
 - [wrap_np.py](file://motrix_rl/src/motrix_rl/skrl/jax/wrap_np.py#L35-L61)
@@ -399,7 +426,7 @@ Guidelines:
 - [reward.py](file://motrix_envs/src/motrix_envs/np/reward.py#L63-L84)
 - [cfg.py](file://motrix_envs/src/motrix_envs/locomotion/go1/cfg.py#L96-L120)
 - [cfg.py](file://motrix_envs/src/motrix_envs/manipulation/franka_lift_cube/cfg.py#L69-L84)
-- [cfg.py](file://motrix_envs/src/motrix_envs/navigation/vbot/cfg.py#L430-L684)
+- [cfg_opendoge.py](file://motrix_envs/src/motrix_envs/navigation/vbot/cfg_opendoge.py#L352-L972)
 
 ## Dependency Analysis
 The PPO implementation exhibits clear separation of concerns:
@@ -412,6 +439,7 @@ The PPO implementation exhibits clear separation of concerns:
 graph TB
 CFG["PPOCfg<br/>motrix_rl/skrl/cfg.py"]
 ECFG["Environment PPOCfgs<br/>motrix_rl/cfgs.py"]
+ODCFG["OpenDoge PPOCfgs<br/>motrix_rl/cfgs_opendoge.py"]
 JAXP["JAX PPO Trainer<br/>motrix_rl/skrl/jax/train/ppo.py"]
 TORCHP["PyTorch PPO Trainer<br/>motrix_rl/skrl/torch/train/ppo.py"]
 JAXW["JAX Env Wrapper<br/>motrix_rl/skrl/jax/wrap_np.py"]
@@ -419,6 +447,7 @@ TORCHW["PyTorch Env Wrapper<br/>motrix_rl/skrl/torch/wrap_np.py"]
 ENV["NpEnv<br/>motrix_envs/np/env.py"]
 REW["Rewards<br/>motrix_envs/np/reward.py"]
 ECFG --> CFG
+ODCFG --> CFG
 JAXP --> CFG
 TORCHP --> CFG
 JAXP --> JAXW
@@ -431,6 +460,7 @@ ENV --> REW
 **Diagram sources**
 - [cfg.py](file://motrix_rl/src/motrix_rl/skrl/cfg.py#L28-L74)
 - [cfgs.py](file://motrix_rl/src/motrix_rl/cfgs.py#L22-L416)
+- [cfgs_opendoge.py](file://motrix_rl/src/motrix_rl/cfgs_opendoge.py#L333-L471)
 - [ppo.py](file://motrix_rl/src/motrix_rl/skrl/jax/train/ppo.py#L145-L184)
 - [ppo.py](file://motrix_rl/src/motrix_rl/skrl/torch/train/ppo.py#L145-L183)
 - [wrap_np.py](file://motrix_rl/src/motrix_rl/skrl/jax/wrap_np.py#L27-L81)
@@ -441,6 +471,7 @@ ENV --> REW
 **Section sources**
 - [cfg.py](file://motrix_rl/src/motrix_rl/skrl/cfg.py#L28-L74)
 - [cfgs.py](file://motrix_rl/src/motrix_rl/cfgs.py#L22-L416)
+- [cfgs_opendoge.py](file://motrix_rl/src/motrix_rl/cfgs_opendoge.py#L333-L471)
 - [ppo.py](file://motrix_rl/src/motrix_rl/skrl/jax/train/ppo.py#L145-L184)
 - [ppo.py](file://motrix_rl/src/motrix_rl/skrl/torch/train/ppo.py#L145-L183)
 - [wrap_np.py](file://motrix_rl/src/motrix_rl/skrl/jax/wrap_np.py#L27-L81)
@@ -456,12 +487,14 @@ ENV --> REW
 - Preprocessing: Standardization of states and values can accelerate convergence.
 - Rendering: Disabling rendering (headless) improves throughput during training.
 
-**Updated** Enhanced performance considerations for VBot navigation section training:
+**Updated** Enhanced performance considerations for OpenDoge competition training:
 - **High-throughput training**: 2048 parallel environments enable rapid exploration of complex navigation terrains
 - **Optimized batch processing**: 48 rollouts with 32 mini-batches provide balanced compute efficiency
 - **Gradient stability**: 1.0 gradient clipping prevents divergence in challenging navigation scenarios
 - **Memory management**: Specialized configurations for section 002/012/013 terrain complexity
 - **Advanced reward shaping**: Enhanced reward functions improve learning signal quality for complex navigation tasks
+- **Path-point navigation**: Systematic waypoint tracking requires careful reward balancing and termination condition tuning
+- **Terrain adaptation**: Different terrain types require adaptive PD controller parameters and reward scaling
 
 ## Troubleshooting Guide
 Common issues and remedies:
@@ -471,9 +504,11 @@ Common issues and remedies:
 - Reward spikes: Apply reward shaping to normalize magnitudes; inspect environment reward functions.
 - Episode truncation: Increase max episode steps or adjust termination conditions in environment configs.
 
-**Updated** Enhanced troubleshooting guidance for navigation-specific challenges:
-- **Navigation terrain issues**: Section 002/012/013 terrains may require adjusted termination conditions and reward scaling
-- **Complex geometry**: Terrain complexity in sections 002/012/013 may necessitate higher learning rates and longer episodes
+**Updated** Enhanced troubleshooting guidance for OpenDoge competition navigation challenges:
+- **Path-point navigation issues**: Waypoint detection may require adjusted termination conditions and reward scaling
+- **Complex terrain navigation**: Sections 002/012/013 terrains may require adjusted termination conditions and reward scaling
+- **Difficulty mode adaptation**: Different difficulty levels (simple to hard-6) may require tuning of reward components and safety parameters
+- **Conservative training**: Increased safety measures may slow learning but improve stability on complex terrains
 - **Contact detection**: Specialized collision detection for VBot feet may require tuning of termination thresholds
 - **Gradient explosion**: 1.0 gradient clipping helps prevent divergence in complex navigation scenarios
 - **Reward shaping**: Enhanced reward functions require careful tuning of individual reward components
@@ -487,26 +522,31 @@ Common issues and remedies:
 ## Conclusion
 The PPO implementation in MotrixLab-S1 provides a robust, backend-agnostic framework for training policies in complex physics environments. By leveraging SKRL's agent and trainer abstractions, the system supports both JAX and PyTorch backends with minimal duplication. Configuration-driven design enables easy customization for diverse tasks, while environment wrappers and reward systems integrate seamlessly with MotrixSim. Proper tuning of hyperparameters and careful monitoring of training metrics are essential for achieving stable and efficient learning across tasks ranging from classic control to locomotion and manipulation.
 
-**Updated** The enhanced VBot navigation training configurations demonstrate the system's capability to handle increasingly sophisticated robotic control challenges through specialized hyperparameter tuning and advanced gradient clipping strategies. The addition of dedicated configurations for sections 002, 012, and 013 showcases the framework's flexibility in adapting to complex terrain navigation tasks with optimized learning rates, rollout lengths, and network architectures designed for challenging locomotion scenarios.
+**Updated** The enhanced OpenDoge training configurations demonstrate the system's capability to handle increasingly sophisticated robotic control challenges through specialized hyperparameter tuning and advanced gradient clipping strategies. The addition of comprehensive VBot navigation training setups for MotrixArena S1 competition showcases the framework's flexibility in adapting to complex terrain navigation tasks with optimized learning rates, rollout lengths, and network architectures designed for challenging locomotion scenarios. The integration of path-point navigation systems, terrain adaptation mechanisms, and multiple difficulty modes highlights the system's maturity in handling real-world robotics competition requirements.
 
 ## Appendices
 - Environment-specific configuration examples:
   - Locomotion: Go1 flat/rough/stairs terrains with reward scaling and termination conditions
   - Manipulation: Franka lift cube with position control and asset-based termination
   - Navigation: Anymal C and VBot navigation with terrain-specific reward configurations
+  - **OpenDoge Competition**: Comprehensive VBot navigation training setups for MotrixArena S1 with path-point navigation and terrain adaptation
   - **VBot Navigation Sections 002, 012, 013**: Advanced configurations with 2048 parallel environments, 48 rollouts, 6 learning epochs, and optimized gradient clipping for complex terrain navigation
+  - **OpenDoge Sections 001, 01**: Competition-specific training configurations with path-point navigation and adaptive PD controllers
 
-**Updated** Enhanced VBot navigation section configurations with specialized training parameters:
+**Updated** Enhanced OpenDoge competition configurations with specialized training parameters:
 
-**Advanced VBot Navigation Configurations**:
-- **Section 002**: Full terrain training with 60-second episodes and comprehensive terrain coverage
-- **Section 012**: Complex terrain configuration optimized for challenging navigation scenarios
-- **Section 013**: Final section configuration with specialized reward shaping and termination conditions
-- **Shared Hyperparameters**: All three sections use identical hyperparameters (2048 envs, 48 rollouts, 6 epochs, 32 batches, 1.0 grad clip) for consistent training methodology
+**MotrixArena S1 Competition Configurations**:
+- **Section 001**: Flat terrain training with fixed targets, 40-second episodes, and 4000-step maximum
+- **Section 01**: Full terrain training with 14-waypoint path-point navigation, 120-second episodes, and 12000-step maximum
+- **Sections 011, 012, 013**: Individual section training with specialized terrain configurations
+- **Section 002**: Comprehensive terrain training with 60-second episodes and 6000-step maximum
+- **Path-point Navigation System**: Contact sensor-based waypoint detection with configurable difficulty modes (simple to hard-6)
+- **Terrain Adaptation**: Adaptive PD controller parameters for different terrain types (flat, stairs, obstacles)
+- **Shared Hyperparameters**: All OpenDoge sections use identical hyperparameters (2048 envs, 48 rollouts, 6 epochs, 32 batches, 1.0 grad clip) for consistent training methodology
 
 **Section sources**
 - [cfg.py](file://motrix_envs/src/motrix_envs/locomotion/go1/cfg.py#L122-L188)
 - [cfg.py](file://motrix_envs/src/motrix_envs/manipulation/franka_lift_cube/cfg.py#L69-L84)
 - [cfgs.py](file://motrix_rl/src/motrix_rl/cfgs.py#L277-L416)
-- [cfg.py](file://motrix_envs/src/motrix_envs/navigation/vbot/cfg.py#L430-L684)
-- [cfgs.py](file://motrix_rl/src/motrix_rl/cfgs.py#L418-L444)
+- [cfg_opendoge.py](file://motrix_envs/src/motrix_envs/navigation/vbot/cfg_opendoge.py#L352-L972)
+- [cfgs_opendoge.py](file://motrix_rl/src/motrix_rl/cfgs_opendoge.py#L333-L500)

@@ -17,16 +17,17 @@
 - [app.py](file://pip-uninstall-uy98kyog/app.py)
 - [flags/_argument_parser.py](file://pip-uninstall-uy98kyog/flags/_argument_parser.py)
 - [testing/flagsaver.py](file://pip-uninstall-uy98kyog/testing/flagsaver.py)
+- [cfg_opendoge.py](file://motrix_envs/src/motrix_envs/navigation/vbot/cfg_opendoge.py)
 </cite>
 
 ## Update Summary
 **Changes Made**
-- Added new VBotSection01Env for elevated platform terrain navigation with dedicated configuration
-- Enhanced waypoint systems with comprehensive difficulty modes (simple to hard-5) and celebration animations
-- Integrated comprehensive Python package infrastructure for flag parsing and testing utilities
-- Expanded waypoint configuration system with 9-waypoint "hard-3" mode and 19-waypoint "hard-5" mode
-- Improved celebration system with smooth pose animations and timing controls
-- Enhanced flag parsing capabilities with comprehensive validation and debugging support
+- Added comprehensive documentation for the new stuck-termination detection system in VBotSection002WaypointEnv
+- Documented the 480-step detection window with 0.15m positional and 15-degree rotational thresholds
+- Added circular buffer tracking implementation details and automatic termination after 240 consecutive detections
+- Updated waypoint configuration documentation for hard-4 difficulty mode with optimized waypoint placement
+- Documented terrain model loading order improvements in scene XML configuration
+- Enhanced termination condition documentation with stuck detection integration
 
 ## Table of Contents
 1. [Introduction](#introduction)
@@ -36,24 +37,25 @@
 5. [Detailed Component Analysis](#detailed-component-analysis)
 6. [Enhanced Turning Logic System](#enhanced-turning-logic-system)
 7. [Waypoint-Based Navigation System](#waypoint-based-navigation-system)
-8. [Difficulty Modes and Configuration](#difficulty-modes-and-configuration)
-9. [Celebration System](#celebration-system)
-10. [Advanced Reward Components](#advanced-reward-components)
-11. [Python Package Infrastructure](#python-package-infrastructure)
-12. [Dependency Analysis](#dependency-analysis)
-13. [Performance Considerations](#performance-considerations)
-14. [Training Methodology](#training-methodology)
-15. [Curriculum Learning and Transfer Learning](#curriculum-learning-and-transfer-learning)
-16. [Troubleshooting Guide](#troubleshooting-guide)
-17. [Conclusion](#conclusion)
+8. [Stuck Termination Detection System](#stuck-termination-detection-system)
+9. [Difficulty Modes and Configuration](#difficulty-modes-and-configuration)
+10. [Celebration System](#celebration-system)
+11. [Advanced Reward Components](#advanced-reward-components)
+12. [Python Package Infrastructure](#python-package-infrastructure)
+13. [Dependency Analysis](#dependency-analysis)
+14. [Performance Considerations](#performance-considerations)
+15. [Training Methodology](#training-methodology)
+16. [Curriculum Learning and Transfer Learning](#curriculum-learning-and-transfer-learning)
+17. [Troubleshooting Guide](#troubleshooting-guide)
+18. [Conclusion](#conclusion)
 
 ## Introduction
 This document describes the VBot navigation environments designed for wheeled robot navigation across multiple track sections. It covers the VBot robot implementation with omnidirectional movement capabilities, the modular track system featuring five distinct sections (001, 011, 012, 013, 01), environment architecture for multi-section navigation, configuration systems for layouts and obstacles, observation space design incorporating wheel odometry, IMU data, and section-specific cues, reward shaping for navigation, and training methodologies including curriculum learning and transfer learning.
 
-**Updated** Enhanced documentation for the new VBotSection01Env for elevated platform terrain navigation, comprehensive waypoint systems with six difficulty modes, and integrated Python package infrastructure for flag parsing and testing utilities. The system now supports advanced navigation scenarios across multiple track sections with sophisticated reward shaping and training methodologies.
+**Updated** Enhanced documentation for the new VBotSection01Env for elevated platform terrain navigation, comprehensive waypoint systems with six difficulty modes, stuck termination detection system, and integrated Python package infrastructure for flag parsing and testing utilities. The system now supports advanced navigation scenarios across multiple track sections with sophisticated reward shaping, termination detection, and training methodologies.
 
 ## Project Structure
-The VBot navigation module resides under navigation/vbot and exposes multiple environment variants via a central registry. Each variant encapsulates a specific track layout and associated configuration, including the new elevated platform terrain environment.
+The VBot navigation module resides under navigation/vbot and exposes multiple environment variants via a central registry. Each variant encapsulates a specific track layout and associated configuration, including the new elevated platform terrain environment and enhanced stuck detection system.
 
 ```mermaid
 graph TB
@@ -65,8 +67,10 @@ D["vbot_section001_np.py<br/>Flat section environment"]
 E["vbot_section011_np.py<br/>Section 01 terrain environment"]
 F["vbot_section012_np.py<br/>Section 02 terrain environment"]
 G["vbot_section013_np.py<br/>Section 03 terrain environment"]
-H["vbot_section002_waypoint_np.py<br/>Waypoint-based Section 002 environment"]
+H["vbot_section002_waypoint_np.py<br/>Waypoint-based Section 002 environment<br/>with stuck detection"]
 I["vbot_section01_np.py<br/>Elevated Platform Terrain Environment"]
+J["cfg_opendoge.py<br/>Enhanced configuration with stuck detection"]
+K["scene_section002_waypoint.xml<br/>Terrain model loading order"]
 end
 A --> B
 A --> C
@@ -76,6 +80,8 @@ A --> F
 A --> G
 A --> H
 A --> I
+B --> J
+H --> K
 ```
 
 **Diagram sources**
@@ -88,6 +94,8 @@ A --> I
 - [vbot_section013_np.py](file://motrix_envs/src/motrix_envs/navigation/vbot/vbot_section013_np.py#L40-L41)
 - [vbot_section002_waypoint_np.py](file://motrix_envs/src/motrix_envs/navigation/vbot/vbot_section002_waypoint_np.py#L27-L33)
 - [vbot_section01_np.py](file://motrix_envs/src/motrix_envs/navigation/vbot/vbot_section01_np.py#L40-L41)
+- [cfg_opendoge.py](file://motrix_envs/src/motrix_envs/navigation/vbot/cfg_opendoge.py#L780-L973)
+- [scene_section002_waypoint.xml](file://motrix_envs/src/motrix_envs/navigation/vbot/xmls/scene_section002_waypoint.xml#L38-L65)
 
 **Section sources**
 - [__init__.py](file://motrix_envs/src/motrix_envs/navigation/vbot/__init__.py#L17-L35)
@@ -99,16 +107,18 @@ A --> I
 - Section-Specific Environments: Specialized variants adapt control strategies, termination conditions, and reward shaping for different track sections, including slope-aware PD control and dynamic stability rewards.
 - **Enhanced Waypoint Navigation**: Advanced waypoint system with ordered path traversal, visited waypoints tracking, automatic goal updates, and intelligent turning prioritization.
 - **Elevated Platform Terrain**: New dedicated environment for elevated platform navigation with specialized configuration and control parameters.
+- **Stuck Termination Detection**: New system that monitors robot motion over extended periods to detect and terminate stuck situations automatically.
 
 Key responsibilities:
 - Action application and PD torque computation
 - Observation extraction from sensors (IMU, joint states, commands)
-- Termination detection (contact, tilt, DOF limits)
+- Termination detection (contact, tilt, DOF limits, stuck detection)
 - Reward computation balancing tracking, stability, and completion
 - **Waypoint detection and ordered path following with dynamic goal updates**
 - **Enhanced downhill state detection and adaptive control parameter adjustment**
 - **Intelligent turning logic with arctan2-based heading calculations and large turn prioritization**
 - **Elevated platform terrain navigation with specialized control parameters**
+- **Stuck detection system monitoring position and rotation changes over 480-step windows**
 
 **Section sources**
 - [cfg.py](file://motrix_envs/src/motrix_envs/navigation/vbot/cfg.py#L118-L138)
@@ -129,11 +139,12 @@ EV["VBot Environments<br/>Flat + Sections + Waypoint + Elevated Platform"]
 CFG["Configuration Classes<br/>Noise, Control, Init, Commands,<br/>Normalization, Assets, Sensors"]
 OBS["Observation Space<br/>LinVel, Gyro, Gravity,<br/>Joint Pos/Vel, Last Actions,<br/>Commands, Pos/Error, Heading/Error,<br/>Distance, Reached, Stop Ready"]
 RWD["Reward Computation<br/>Tracking, Approach, Stability,<br/>Termination Penalties<br/>+ Advanced Turn Rewards"]
-TERM["Termination Logic<br/>Contact, Tilt, DOF Limits"]
+TERM["Termination Logic<br/>Contact, Tilt, DOF Limits<br/>+ Stuck Detection"]
 WP["Waypoint System<br/>Detection, Path Planning,<br/>Celebration Actions"]
 DH["Downhill Navigation<br/>Enhanced Detection, Stability<br/>Control Parameters"]
 TURN["Enhanced Turning Logic<br/>Arctan2 Heading, Large Turn<br/>Prioritization"]
 EP["Elevated Platform<br/>Specialized Control, Height<br/>Navigation Parameters"]
+STUCK["Stuck Detection System<br/>480-step Circular Buffer,<br/>Position/Rotation Monitoring"]
 FLAG["Flag Parsing<br/>Command Line, Validation,<br/>Debugging Support"]
 TEST["Testing Utilities<br/>Flagsaver, Parameterized,<br/>XML Reporting"]
 end
@@ -149,6 +160,7 @@ EV --> WP
 EV --> DH
 EV --> TURN
 EV --> EP
+EV --> STUCK
 EV --> FLAG
 EV --> TEST
 RWD --> SENS
@@ -158,6 +170,7 @@ WP --> SENS
 DH --> SENS
 TURN --> SENS
 EP --> SENS
+STUCK --> SENS
 FLAG --> EV
 TEST --> EV
 ```
@@ -209,7 +222,7 @@ Env-->>Agent : "Observation, reward, terminated"
 - Section 012 (Terrain 02): Similar to 011 with terrain-specific adaptations.
 - Section 013 (Terrain 03): Final section with specialized control and reward shaping.
 - **Section 01 (Elevated Platform)**: New dedicated environment for elevated platform navigation with specialized control parameters and height management.
-- **Section 002 Waypoint**: Enhanced Section 002 with dynamic waypoint following, path planning, and ordered traversal capabilities with intelligent turning logic.
+- **Section 002 Waypoint**: Enhanced Section 002 with dynamic waypoint following, path planning, and ordered traversal capabilities with intelligent turning logic and stuck detection system.
 
 ```mermaid
 flowchart TD
@@ -284,12 +297,14 @@ Termination is triggered by:
 - Side flip detection via projected gravity tilt
 - Excessive DOF velocities or numerical instability
 - Timeouts based on episode steps
+- **Stuck detection**: prolonged lack of significant position or rotation changes
 
 These conditions ensure safe and meaningful episodes for training.
 
 **Section sources**
 - [vbot_np.py](file://motrix_envs/src/motrix_envs/navigation/vbot/vbot_np.py#L505-L526)
 - [vbot_section011_np.py](file://motrix_envs/src/motrix_envs/navigation/vbot/vbot_section011_np.py#L573-L634)
+- [vbot_section002_waypoint_np.py](file://motrix_envs/src/motrix_envs/navigation/vbot/vbot_section002_waypoint_np.py#L1119-L1121)
 
 ### Elevated Platform Terrain Environment
 **Updated** The new VBotSection01Env provides specialized navigation capabilities for elevated platform terrain with dedicated configuration and control parameters.
@@ -423,9 +438,96 @@ When a waypoint is reached, the system automatically updates the navigation goal
 - [vbot_section002_waypoint_np.py](file://motrix_envs/src/motrix_envs/navigation/vbot/vbot_section002_waypoint_np.py#L142-L166)
 - [vbot_section002_waypoint_np.py](file://motrix_envs/src/motrix_envs/navigation/vbot/vbot_section002_waypoint_np.py#L384-L421)
 
+## Stuck Termination Detection System
+
+**Updated** The VBotSection002WaypointEnv now includes a comprehensive stuck termination detection system designed to automatically identify and terminate episodes where the robot becomes immobilized or makes minimal progress.
+
+### Detection Algorithm Overview
+The stuck detection system monitors robot motion over extended time windows to identify situations where the robot fails to make meaningful progress:
+
+#### Detection Window Configuration
+- **Window Size**: 480 simulation steps (8 seconds at 60Hz)
+- **Position Threshold**: 0.15 meters maximum displacement within the window
+- **Rotation Threshold**: 15 degrees maximum angular change within the window
+- **Consecutive Detection**: Requires 240 consecutive detections (4 seconds) before termination
+
+#### Circular Buffer Implementation
+The system uses a circular buffer architecture to efficiently track robot state over the detection window:
+
+```mermaid
+flowchart TD
+Start(["Initialize Stuck Detection"]) --> BufferInit["Initialize Circular Buffers<br/>- Position History: 480×3 array<br/>- Yaw History: 480×1 array<br/>- History Index: 0<br/>- Filled Flag: False"]
+BufferInit --> StepLoop["For Each Simulation Step"]
+StepLoop --> RecordPos["Record Current Position<br/>and Yaw Angle"]
+RecordPos --> UpdateIndex["Update Circular Buffer Index"]
+UpdateIndex --> CheckFill{"Buffer Filled?"}
+CheckFill --> |No| StepLoop
+CheckFill --> |Yes| CalcDiff["Calculate Window Statistics"]
+CalcDiff --> CalcPos["Max Position Change<br/>= max(||positions - current_pos||)"]
+CalcDiff --> CalcRot["Max Rotation Change<br/>= max(||arctan2(sin(yaws - yaw), cos(yaws - yaw))||)"]
+CalcPos --> CheckStuck{"Position < 0.15m AND<br/>Rotation < 15°?"}
+CalcRot --> CheckStuck
+CheckStuck --> |Yes| IncCount["Increment Consecutive Count"]
+CheckStuck --> |No| ResetCount["Reset Consecutive Count<br/>to 0"]
+IncCount --> CheckTerminate{"Consecutive Count >= 240?"}
+ResetCount --> StepLoop
+CheckTerminate --> |Yes| SetDetected["Set Stuck Detected<br/>= True"]
+CheckTerminate --> |No| StepLoop
+SetDetected --> StepLoop
+```
+
+**Diagram sources**
+- [vbot_section002_waypoint_np.py](file://motrix_envs/src/motrix_envs/navigation/vbot/vbot_section002_waypoint_np.py#L103-L120)
+- [vbot_section002_waypoint_np.py](file://motrix_envs/src/motrix_envs/navigation/vbot/vbot_section002_waypoint_np.py#L121-L171)
+
+### Detection Logic Implementation
+The stuck detection algorithm operates on a per-environment basis with the following key components:
+
+#### State Variables
+- `_stuck_pos_history`: Circular buffer storing position history for each environment
+- `_stuck_yaw_history`: Circular buffer storing yaw angle history for each environment
+- `_stuck_history_idx`: Current write position in circular buffers
+- `_stuck_history_filled`: Boolean flag indicating when buffers are ready for detection
+- `_stuck_consecutive_count`: Counter for consecutive stuck detections
+- `_stuck_detected`: Boolean flag indicating stuck state for each environment
+
+#### Detection Criteria
+The system evaluates two primary criteria simultaneously:
+1. **Position Stability**: Robot must not move more than 0.15 meters in any direction during the 480-step window
+2. **Orientation Stability**: Robot must not rotate more than 15 degrees during the 480-step window
+
+#### Termination Trigger
+Once both criteria are met for 240 consecutive steps (4 seconds), the system sets the stuck detection flag, which is then incorporated into the termination logic.
+
+### Integration with Termination System
+The stuck detection integrates seamlessly with the existing termination system:
+
+#### Termination Enhancement
+The stuck detection adds an additional termination condition alongside existing criteria:
+- Timeout-based termination
+- Contact-based termination  
+- Tilt-based termination
+- Gyroscope anomaly detection
+- X-axis boundary detection
+- **Stuck detection termination**
+
+#### Detection Timing
+The stuck detection is evaluated continuously during episode execution and only becomes active after the circular buffer is filled (after 480 steps). This prevents false positives during initial episode setup.
+
+#### Reset Mechanism
+The stuck detection state is reset when:
+- A waypoint is successfully reached
+- The robot makes significant progress (exceeds detection thresholds)
+- Episode resets occur
+
+**Section sources**
+- [vbot_section002_waypoint_np.py](file://motrix_envs/src/motrix_envs/navigation/vbot/vbot_section002_waypoint_np.py#L103-L120)
+- [vbot_section002_waypoint_np.py](file://motrix_envs/src/motrix_envs/navigation/vbot/vbot_section002_waypoint_np.py#L121-L171)
+- [vbot_section002_waypoint_np.py](file://motrix_envs/src/motrix_envs/navigation/vbot/vbot_section002_waypoint_np.py#L1119-L1121)
+
 ## Difficulty Modes and Configuration
 
-**Updated** The waypoint system supports six difficulty modes, each with different waypoint configurations and complexity levels. The system now includes modes up to hard-5 with maximum complexity.
+**Updated** The waypoint system supports six difficulty modes, each with different waypoint configurations and complexity levels. The system now includes modes up to hard-5 with maximum complexity, including optimized waypoint placement for hard-4 difficulty mode.
 
 ### Difficulty Mode Configuration
 Each mode defines a unique set of waypoints with varying complexity:
@@ -461,9 +563,10 @@ Each mode defines a unique set of waypoints with varying complexity:
 - **Complexity**: Maximum path complexity with celebratory animations at every waypoint
 
 #### Hard-4 Mode (New)
-- **Waypoints**: 19 waypoints including 14 reward points and 5 celebration points
+- **Waypoints**: 19 waypoints including 15 reward points and 4 celebration points
 - **Action Requirement**: Celebration actions at all waypoints
 - **Complexity**: Maximum path complexity with extensive reward points and celebratory actions
+- **Optimized Placement**: Strategic waypoint positioning for challenging terrain sections
 
 #### Hard-5 Mode (New)
 - **Waypoints**: 20 waypoints including 17 reward points and 3 celebration points
@@ -471,12 +574,11 @@ Each mode defines a unique set of waypoints with varying complexity:
 - **Complexity**: Maximum path complexity with extensive reward points and celebratory actions
 
 ### Automatic Configuration Selection
-The system uses Python's `__post_init__` method to automatically select the appropriate waypoint configuration based on the `difficulty_mode` setting, ensuring seamless mode switching. The default difficulty mode is now 'hard-3'.
+The system uses Python's `__post_init__` method to automatically select the appropriate waypoint configuration based on the `difficulty_mode` setting, ensuring seamless mode switching. The default difficulty mode is now 'hard-4'.
 
 **Section sources**
-- [cfg.py](file://motrix_envs/src/motrix_envs/navigation/vbot/cfg.py#L775-L811)
-- [cfg.py](file://motrix_envs/src/motrix_envs/navigation/vbot/cfg.py#L834-L844)
-- [cfg.py](file://motrix_envs/src/motrix_envs/navigation/vbot/cfg.py#L845-L888)
+- [cfg_opendoge.py](file://motrix_envs/src/motrix_envs/navigation/vbot/cfg_opendoge.py#L790-L905)
+- [cfg_opendoge.py](file://motrix_envs/src/motrix_envs/navigation/vbot/cfg_opendoge.py#L907-L911)
 - [scene_section002_waypoint.xml](file://motrix_envs/src/motrix_envs/navigation/vbot/xmls/scene_section002_waypoint.xml#L51-L80)
 
 ## Celebration System
@@ -665,6 +767,7 @@ The VBot navigation module depends on:
 - **Flag parsing infrastructure**: Comprehensive Abseil flags package for command-line argument processing
 - **Testing utilities**: Integrated testing framework for development and validation
 - **Application framework**: Complete application management with debugging and profiling support
+- **Stuck detection system**: Advanced circular buffer implementation for motion monitoring
 
 ```mermaid
 graph TB
@@ -680,7 +783,8 @@ RWD["Advanced Reward Components<br/>Turn Rewards + Proximity Guidance"]
 FLAG["Flag Parsing<br/>Abseil Flags Infrastructure"]
 TEST["Testing Utilities<br/>Flagsaver + Parameterized Tests"]
 APP["Application Framework<br/>Debugging + Profiling Support"]
-end
+STUCK["Stuck Detection System<br/>Circular Buffer + Motion Monitoring"]
+END
 REG --> ENV
 CFG --> ENV
 ENV --> MATH
@@ -692,9 +796,11 @@ ENV --> RWD
 ENV --> FLAG
 ENV --> TEST
 ENV --> APP
+ENV --> STUCK
 FLAG --> ENV
 TEST --> ENV
 APP --> ENV
+STUCK --> ENV
 ```
 
 **Diagram sources**
@@ -730,6 +836,8 @@ APP --> ENV
 - **Flag parsing performance**: Cached argument parsers and efficient flag validation minimize startup overhead.
 - **Testing infrastructure**: Comprehensive testing utilities enable thorough validation and debugging support.
 - **Application framework**: Integrated debugging and profiling support streamline development workflow.
+- **Stuck detection efficiency**: Circular buffer implementation minimizes memory overhead while providing comprehensive motion monitoring.
+- **Terrain model loading order**: Optimized XML loading sequence improves scene initialization performance.
 
 ## Training Methodology
 - Flat Base Training: Start with the flat terrain environment to learn basic navigation skills (position/heading tracking, obstacle avoidance).
@@ -738,7 +846,8 @@ APP --> ENV
 - **Waypoint Training**: Train on waypoint-based navigation to learn path following, ordered traversal, and dynamic goal updating.
 - **Celebration Training**: Utilize the enhanced celebration system to learn proper waypoint interaction and animation timing.
 - **Advanced Turning Training**: Utilize the enhanced turning logic system to learn intelligent turn prioritization and large turn handling.
-- **Elevated Platform Training**: Utilize the new VBotSection01Env for specialized elevated platform navigation skills.
+- **Elevated Platform Training**: Utilate the new VBotSection01Env for specialized elevated platform navigation skills.
+- **Stuck Detection Training**: Utilize the stuck detection system to teach robots how to recover from immobilized states.
 - **Difficulty Scaling**: Progress from simple to hard difficulty modes to gradually increase path complexity.
 - Multi-Section Training: Combine sections into longer courses to practice continuous navigation across transitions.
 - **Flag-based Configuration**: Utilize flag parsing for dynamic environment configuration and parameter tuning.
@@ -750,6 +859,7 @@ APP --> ENV
 - **Celebration Curriculum**: Begin with simple waypoint interactions, progress to timed celebrations, and finally master complex animation sequences.
 - **Advanced Turning Curriculum**: Begin with small turns, progress to large turns (>60°), and finally master complex navigation scenarios.
 - **Elevated Platform Curriculum**: Start with basic elevated platform navigation, progress to complex height management, and finally master precision platform traversal.
+- **Stuck Detection Curriculum**: Begin with environments that rarely encounter stuck situations, progress to more challenging terrains with higher stuck probability.
 - **Difficulty Progression**: Systematic progression through difficulty modes (simple → easy → normal → hard-1 → hard-2 → hard-3 → hard-4 → hard-5) for optimal learning.
 - Transfer Learning: Use pre-trained policies from simpler sections as initialization for harder sections. Shared observation/action spaces facilitate cross-task adaptation.
 - Section Interleaving: Alternate between sections during training to improve generalization across diverse track layouts.
@@ -775,6 +885,9 @@ Common issues and remedies:
 - **Flag parsing issues**: Verify flag definitions and validation rules are correctly configured for the intended use case.
 - **Testing utility conflicts**: Ensure proper isolation and cleanup when using flagsaver and other testing utilities.
 - **Application framework problems**: Check help flag registration and usage error handling for proper application behavior.
+- **Stuck detection false positives**: Verify detection thresholds (0.15m position, 15° rotation) are appropriate for the robot's capabilities.
+- **Stuck detection performance**: Monitor circular buffer memory usage and detection frequency for optimal performance.
+- **Terrain model loading issues**: Verify XML loading order and model file accessibility for proper scene initialization.
 
 **Section sources**
 - [vbot_section011_np.py](file://motrix_envs/src/motrix_envs/navigation/vbot/vbot_section011_np.py#L573-L634)
@@ -786,4 +899,4 @@ Common issues and remedies:
 ## Conclusion
 The VBot navigation environments provide a flexible, modular framework for training wheeled robots across diverse track sections. With carefully designed observation spaces, reward shaping, and section-specific adaptations, the system supports effective curriculum learning and transfer learning strategies.
 
-**Updated** The enhanced VBot navigation system now features a sophisticated turning logic system with arctan2-based heading calculations, large turn detection (60-degree threshold), and adaptive turn prioritization. The introduction of the new VBotSection01Env for elevated platform terrain navigation provides specialized capabilities for height management and precision platform traversal. The comprehensive waypoint system with six difficulty modes (simple to hard-5) and enhanced celebration system with smooth pose animations provides maximum training complexity and reward opportunities. The integrated Python package infrastructure with flag parsing, testing utilities, and application framework streamlines development, testing, and deployment processes. The renamed 'celebration' system replaces the previous 'special action' terminology with more descriptive naming and improved animation mechanics. The corrected waypoint reach distance parameterization to 0.1 meters ensures optimal balance between reliability and responsiveness. The centralized configuration system and environment registry simplify experimentation and deployment across multiple track layouts, making it an ideal platform for advanced robotics research and education with enhanced navigation capabilities and intelligent behavior patterns.
+**Updated** The enhanced VBot navigation system now features a sophisticated turning logic system with arctan2-based heading calculations, large turn detection (60-degree threshold), and adaptive turn prioritization. The introduction of the new VBotSection01Env for elevated platform terrain navigation provides specialized capabilities for height management and precision platform traversal. The comprehensive waypoint system with six difficulty modes (simple to hard-5) and enhanced celebration system with smooth pose animations provides maximum training complexity and reward opportunities. The integrated Python package infrastructure with flag parsing, testing utilities, and application framework streamlines development, testing, and deployment processes. The renamed 'celebration' system replaces the previous 'special action' terminology with more descriptive naming and improved animation mechanics. The corrected waypoint reach distance parameterization to 0.1 meters ensures optimal balance between reliability and responsiveness. The centralized configuration system and environment registry simplify experimentation and deployment across multiple track layouts. Most significantly, the new stuck termination detection system provides robust automatic termination for immobilized robots, improving training reliability and preventing infinite episodes. The enhanced terrain model loading order in the scene XML optimizes initialization performance. The stuck detection system with its 480-step circular buffer, 0.15m positional threshold, and 15-degree rotational threshold provides comprehensive motion monitoring with automatic termination after 240 consecutive detections. This addition completes the navigation system with advanced failure detection capabilities, making it an ideal platform for advanced robotics research and education with enhanced navigation capabilities, intelligent behavior patterns, and robust termination detection.

@@ -349,7 +349,7 @@ uv run scripts/train.py --env MotrixArena_S1_section01_opendoge
 
 **模型推理:**
 ```bash
-uv run scripts/play.py --env MotrixArena_S1_section001_opendoge --num-envs 10 --checkpoint runs/MotrixArena_S1_section001_opendoge/xx-xx-xx_PPO/checkpoints/best_agent.pickle
+uv run scripts/play.py --env MotrixArena_S1_section001_opendoge --num-envs 10 --policy runs/MotrixArena_S1_section001_opendoge/xx-xx-xx_PPO/checkpoints/best_agent.pickle
 uv run scripts/play.py --env MotrixArena_S1_section01_opendoge --num-envs 10
 ```
 
