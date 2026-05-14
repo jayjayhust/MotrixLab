@@ -22,9 +22,10 @@
 
 ## Update Summary
 **Changes Made**
-- Added comprehensive documentation for the new stuck-termination detection system in VBotSection002WaypointEnv
-- Documented the 480-step detection window with 0.15m positional and 15-degree rotational thresholds
-- Added circular buffer tracking implementation details and automatic termination after 240 consecutive detections
+- Enhanced robot initialization positioning logic documentation for VBotSection002WaypointEnv
+- Updated robot spawn location generation to reflect Method 2 (testing mode) with controlled coordinate ranges
+- Documented the transition from Method 1 (training mode with uniform distribution) to Method 2 (testing mode with fixed ranges)
+- Added backward compatibility information for the commented-out original implementation
 - Updated waypoint configuration documentation for hard-4 difficulty mode with optimized waypoint placement
 - Documented terrain model loading order improvements in scene XML configuration
 - Enhanced termination condition documentation with stuck detection integration
@@ -38,16 +39,17 @@
 6. [Enhanced Turning Logic System](#enhanced-turning-logic-system)
 7. [Waypoint-Based Navigation System](#waypoint-based-navigation-system)
 8. [Stuck Termination Detection System](#stuck-termination-detection-system)
-9. [Difficulty Modes and Configuration](#difficulty-modes-and-configuration)
-10. [Celebration System](#celebration-system)
-11. [Advanced Reward Components](#advanced-reward-components)
-12. [Python Package Infrastructure](#python-package-infrastructure)
-13. [Dependency Analysis](#dependency-analysis)
-14. [Performance Considerations](#performance-considerations)
-15. [Training Methodology](#training-methodology)
-16. [Curriculum Learning and Transfer Learning](#curriculum-learning-and-transfer-learning)
-17. [Troubleshooting Guide](#troubleshooting-guide)
-18. [Conclusion](#conclusion)
+9. [Enhanced Robot Initialization Positioning](#enhanced-robot-initialization-positioning)
+10. [Difficulty Modes and Configuration](#difficulty-modes-and-configuration)
+11. [Celebration System](#celebration-system)
+12. [Advanced Reward Components](#advanced-reward-components)
+13. [Python Package Infrastructure](#python-package-infrastructure)
+14. [Dependency Analysis](#dependency-analysis)
+15. [Performance Considerations](#performance-considerations)
+16. [Training Methodology](#training-methodology)
+17. [Curriculum Learning and Transfer Learning](#curriculum-learning-and-transfer-learning)
+18. [Troubleshooting Guide](#troubleshooting-guide)
+19. [Conclusion](#conclusion)
 
 ## Introduction
 This document describes the VBot navigation environments designed for wheeled robot navigation across multiple track sections. It covers the VBot robot implementation with omnidirectional movement capabilities, the modular track system featuring five distinct sections (001, 011, 012, 013, 01), environment architecture for multi-section navigation, configuration systems for layouts and obstacles, observation space design incorporating wheel odometry, IMU data, and section-specific cues, reward shaping for navigation, and training methodologies including curriculum learning and transfer learning.
@@ -85,20 +87,20 @@ H --> K
 ```
 
 **Diagram sources**
-- [__init__.py](file://motrix_envs/src/motrix_envs/navigation/vbot/__init__.py#L17-L35)
-- [cfg.py](file://motrix_envs/src/motrix_envs/navigation/vbot/cfg.py#L118-L138)
-- [vbot_np.py](file://motrix_envs/src/motrix_envs/navigation/vbot/vbot_np.py#L39-L40)
-- [vbot_section001_np.py](file://motrix_envs/src/motrix_envs/navigation/vbot/vbot_section001_np.py#L40-L41)
-- [vbot_section011_np.py](file://motrix_envs/src/motrix_envs/navigation/vbot/vbot_section011_np.py#L40-L41)
-- [vbot_section012_np.py](file://motrix_envs/src/motrix_envs/navigation/vbot/vbot_section012_np.py#L40-L41)
-- [vbot_section013_np.py](file://motrix_envs/src/motrix_envs/navigation/vbot/vbot_section013_np.py#L40-L41)
-- [vbot_section002_waypoint_np.py](file://motrix_envs/src/motrix_envs/navigation/vbot/vbot_section002_waypoint_np.py#L27-L33)
-- [vbot_section01_np.py](file://motrix_envs/src/motrix_envs/navigation/vbot/vbot_section01_np.py#L40-L41)
-- [cfg_opendoge.py](file://motrix_envs/src/motrix_envs/navigation/vbot/cfg_opendoge.py#L780-L973)
-- [scene_section002_waypoint.xml](file://motrix_envs/src/motrix_envs/navigation/vbot/xmls/scene_section002_waypoint.xml#L38-L65)
+- [__init__.py:17-35](file://motrix_envs/src/motrix_envs/navigation/vbot/__init__.py#L17-L35)
+- [cfg.py:118-138](file://motrix_envs/src/motrix_envs/navigation/vbot/cfg.py#L118-L138)
+- [vbot_np.py:39-40](file://motrix_envs/src/motrix_envs/navigation/vbot/vbot_np.py#L39-L40)
+- [vbot_section001_np.py:40-41](file://motrix_envs/src/motrix_envs/navigation/vbot/vbot_section001_np.py#L40-L41)
+- [vbot_section011_np.py:40-41](file://motrix_envs/src/motrix_envs/navigation/vbot/vbot_section011_np.py#L40-L41)
+- [vbot_section012_np.py:40-41](file://motrix_envs/src/motrix_envs/navigation/vbot/vbot_section012_np.py#L40-L41)
+- [vbot_section013_np.py:40-41](file://motrix_envs/src/motrix_envs/navigation/vbot/vbot_section013_np.py#L40-L41)
+- [vbot_section002_waypoint_np.py:27-33](file://motrix_envs/src/motrix_envs/navigation/vbot/vbot_section002_waypoint_np.py#L27-L33)
+- [vbot_section01_np.py:40-41](file://motrix_envs/src/motrix_envs/navigation/vbot/vbot_section01_np.py#L40-L41)
+- [cfg_opendoge.py:780-973](file://motrix_envs/src/motrix_envs/navigation/vbot/cfg_opendoge.py#L780-L973)
+- [scene_section002_waypoint.xml:38-65](file://motrix_envs/src/motrix_envs/navigation/vbot/xmls/scene_section002_waypoint.xml#L38-L65)
 
 **Section sources**
-- [__init__.py](file://motrix_envs/src/motrix_envs/navigation/vbot/__init__.py#L17-L35)
+- [__init__.py:17-35](file://motrix_envs/src/motrix_envs/navigation/vbot/__init__.py#L17-L35)
 
 ## Core Components
 - Environment Registry and Registration: Environments are registered under names such as "vbot_navigation_flat", "vbot_navigation_section001", "vbot_navigation_section011", "vbot_navigation_section012", "vbot_navigation_section013", "vbot_navigation_section01", and "vbot_navigation_section002_waypoint". These names are used to instantiate specific environment variants.
@@ -108,6 +110,7 @@ H --> K
 - **Enhanced Waypoint Navigation**: Advanced waypoint system with ordered path traversal, visited waypoints tracking, automatic goal updates, and intelligent turning prioritization.
 - **Elevated Platform Terrain**: New dedicated environment for elevated platform navigation with specialized configuration and control parameters.
 - **Stuck Termination Detection**: New system that monitors robot motion over extended periods to detect and terminate stuck situations automatically.
+- **Enhanced Robot Initialization Positioning**: Improved spawn location generation with controlled testing conditions and backward compatibility with original training mode.
 
 Key responsibilities:
 - Action application and PD torque computation
@@ -119,15 +122,16 @@ Key responsibilities:
 - **Intelligent turning logic with arctan2-based heading calculations and large turn prioritization**
 - **Elevated platform terrain navigation with specialized control parameters**
 - **Stuck detection system monitoring position and rotation changes over 480-step windows**
+- **Enhanced robot initialization positioning with Method 2 testing mode and controlled coordinate ranges**
 
 **Section sources**
-- [cfg.py](file://motrix_envs/src/motrix_envs/navigation/vbot/cfg.py#L118-L138)
-- [vbot_np.py](file://motrix_envs/src/motrix_envs/navigation/vbot/vbot_np.py#L249-L291)
-- [vbot_section011_np.py](file://motrix_envs/src/motrix_envs/navigation/vbot/vbot_section011_np.py#L245-L299)
-- [vbot_section012_np.py](file://motrix_envs/src/motrix_envs/navigation/vbot/vbot_section012_np.py#L245-L299)
-- [vbot_section013_np.py](file://motrix_envs/src/motrix_envs/navigation/vbot/vbot_section013_np.py#L245-L299)
-- [vbot_section002_waypoint_np.py](file://motrix_envs/src/motrix_envs/navigation/vbot/vbot_section002_waypoint_np.py#L27-L33)
-- [vbot_section01_np.py](file://motrix_envs/src/motrix_envs/navigation/vbot/vbot_section01_np.py#L40-L41)
+- [cfg.py:118-138](file://motrix_envs/src/motrix_envs/navigation/vbot/cfg.py#L118-L138)
+- [vbot_np.py:249-291](file://motrix_envs/src/motrix_envs/navigation/vbot/vbot_np.py#L249-L291)
+- [vbot_section011_np.py:245-299](file://motrix_envs/src/motrix_envs/navigation/vbot/vbot_section011_np.py#L245-L299)
+- [vbot_section012_np.py:245-299](file://motrix_envs/src/motrix_envs/navigation/vbot/vbot_section012_np.py#L245-L299)
+- [vbot_section013_np.py:245-299](file://motrix_envs/src/motrix_envs/navigation/vbot/vbot_section013_np.py#L245-L299)
+- [vbot_section002_waypoint_np.py:27-33](file://motrix_envs/src/motrix_envs/navigation/vbot/vbot_section002_waypoint_np.py#L27-L33)
+- [vbot_section01_np.py:40-41](file://motrix_envs/src/motrix_envs/navigation/vbot/vbot_section01_np.py#L40-L41)
 
 ## Architecture Overview
 The VBot navigation architecture integrates a physics-based simulator with configurable environments. Each environment variant inherits common functionality while overriding section-specific aspects such as terrain geometry, asset definitions, and reward shaping.
@@ -147,6 +151,7 @@ EP["Elevated Platform<br/>Specialized Control, Height<br/>Navigation Parameters"
 STUCK["Stuck Detection System<br/>480-step Circular Buffer,<br/>Position/Rotation Monitoring"]
 FLAG["Flag Parsing<br/>Command Line, Validation,<br/>Debugging Support"]
 TEST["Testing Utilities<br/>Flagsaver, Parameterized,<br/>XML Reporting"]
+INIT["Enhanced Robot Initialization<br/>Method 2 Testing Mode<br/>Controlled Coordinate Ranges"]
 end
 subgraph "Physics Layer"
 SIM["Physics Engine<br/>Scene, Bodies, Contacts"]
@@ -163,6 +168,7 @@ EV --> EP
 EV --> STUCK
 EV --> FLAG
 EV --> TEST
+EV --> INIT
 RWD --> SENS
 OBS --> SENS
 TERM --> SENS
@@ -173,16 +179,17 @@ EP --> SENS
 STUCK --> SENS
 FLAG --> EV
 TEST --> EV
+INIT --> SENS
 ```
 
 **Diagram sources**
-- [cfg.py](file://motrix_envs/src/motrix_envs/navigation/vbot/cfg.py#L24-L138)
-- [vbot_np.py](file://motrix_envs/src/motrix_envs/navigation/vbot/vbot_np.py#L423-L538)
-- [vbot_section011_np.py](file://motrix_envs/src/motrix_envs/navigation/vbot/vbot_section011_np.py#L456-L571)
-- [vbot_section002_waypoint_np.py](file://motrix_envs/src/motrix_envs/navigation/vbot/vbot_section002_waypoint_np.py#L142-L166)
-- [vbot_section01_np.py](file://motrix_envs/src/motrix_envs/navigation/vbot/vbot_section01_np.py#L40-L41)
-- [flags/__init__.py](file://pip-uninstall-uy98kyog/flags/__init__.py#L14-L221)
-- [app.py](file://pip-uninstall-uy98kyog/app.py#L15-L540)
+- [cfg.py:24-138](file://motrix_envs/src/motrix_envs/navigation/vbot/cfg.py#L24-L138)
+- [vbot_np.py:423-538](file://motrix_envs/src/motrix_envs/navigation/vbot/vbot_np.py#L423-L538)
+- [vbot_section011_np.py:456-571](file://motrix_envs/src/motrix_envs/navigation/vbot/vbot_section011_np.py#L456-L571)
+- [vbot_section002_waypoint_np.py:142-166](file://motrix_envs/src/motrix_envs/navigation/vbot/vbot_section002_waypoint_np.py#L142-L166)
+- [vbot_section01_np.py:40-41](file://motrix_envs/src/motrix_envs/navigation/vbot/vbot_section01_np.py#L40-L41)
+- [flags/__init__.py:14-221](file://pip-uninstall-uy98kyog/flags/__init__.py#L14-L221)
+- [app.py:15-540](file://pip-uninstall-uy98kyog/app.py#L15-L540)
 
 ## Detailed Component Analysis
 
@@ -208,13 +215,13 @@ Env-->>Agent : "Observation, reward, terminated"
 ```
 
 **Diagram sources**
-- [vbot_np.py](file://motrix_envs/src/motrix_envs/navigation/vbot/vbot_np.py#L249-L291)
-- [vbot_np.py](file://motrix_envs/src/motrix_envs/navigation/vbot/vbot_np.py#L388-L503)
+- [vbot_np.py:249-291](file://motrix_envs/src/motrix_envs/navigation/vbot/vbot_np.py#L249-L291)
+- [vbot_np.py:388-503](file://motrix_envs/src/motrix_envs/navigation/vbot/vbot_np.py#L388-L503)
 
 **Section sources**
-- [vbot_np.py](file://motrix_envs/src/motrix_envs/navigation/vbot/vbot_np.py#L62-L69)
-- [vbot_np.py](file://motrix_envs/src/motrix_envs/navigation/vbot/vbot_np.py#L249-L291)
-- [vbot_np.py](file://motrix_envs/src/motrix_envs/navigation/vbot/vbot_np.py#L388-L503)
+- [vbot_np.py:62-69](file://motrix_envs/src/motrix_envs/navigation/vbot/vbot_np.py#L62-L69)
+- [vbot_np.py:249-291](file://motrix_envs/src/motrix_envs/navigation/vbot/vbot_np.py#L249-L291)
+- [vbot_np.py:388-503](file://motrix_envs/src/motrix_envs/navigation/vbot/vbot_np.py#L388-L503)
 
 ### Modular Track System and Section-Specific Challenges
 - Section 001 (Flat): Designed for basic navigation tasks with controlled spawn regions and simplified termination logic.
@@ -237,17 +244,17 @@ Terminate --> |Yes| Reset["Reset Environment"]
 ```
 
 **Diagram sources**
-- [vbot_section001_np.py](file://motrix_envs/src/motrix_envs/navigation/vbot/vbot_section001_np.py#L782-L800)
-- [vbot_section011_np.py](file://motrix_envs/src/motrix_envs/navigation/vbot/vbot_section011_np.py#L573-L634)
-- [vbot_section01_np.py](file://motrix_envs/src/motrix_envs/navigation/vbot/vbot_section01_np.py#L495-L680)
+- [vbot_section001_np.py:782-800](file://motrix_envs/src/motrix_envs/navigation/vbot/vbot_section001_np.py#L782-L800)
+- [vbot_section011_np.py:573-634](file://motrix_envs/src/motrix_envs/navigation/vbot/vbot_section011_np.py#L573-L634)
+- [vbot_section01_np.py:495-680](file://motrix_envs/src/motrix_envs/navigation/vbot/vbot_section01_np.py#L495-L680)
 
 **Section sources**
-- [vbot_section001_np.py](file://motrix_envs/src/motrix_envs/navigation/vbot/vbot_section001_np.py#L40-L106)
-- [vbot_section011_np.py](file://motrix_envs/src/motrix_envs/navigation/vbot/vbot_section011_np.py#L40-L106)
-- [vbot_section012_np.py](file://motrix_envs/src/motrix_envs/navigation/vbot/vbot_section012_np.py#L40-L106)
-- [vbot_section013_np.py](file://motrix_envs/src/motrix_envs/navigation/vbot/vbot_section013_np.py#L40-L106)
-- [vbot_section002_waypoint_np.py](file://motrix_envs/src/motrix_envs/navigation/vbot/vbot_section002_waypoint_np.py#L142-L166)
-- [vbot_section01_np.py](file://motrix_envs/src/motrix_envs/navigation/vbot/vbot_section01_np.py#L40-L41)
+- [vbot_section001_np.py:40-106](file://motrix_envs/src/motrix_envs/navigation/vbot/vbot_section001_np.py#L40-L106)
+- [vbot_section011_np.py:40-106](file://motrix_envs/src/motrix_envs/navigation/vbot/vbot_section011_np.py#L40-L106)
+- [vbot_section012_np.py:40-106](file://motrix_envs/src/motrix_envs/navigation/vbot/vbot_section012_np.py#L40-L106)
+- [vbot_section013_np.py:40-106](file://motrix_envs/src/motrix_envs/navigation/vbot/vbot_section013_np.py#L40-L106)
+- [vbot_section002_waypoint_np.py:142-166](file://motrix_envs/src/motrix_envs/navigation/vbot/vbot_section002_waypoint_np.py#L142-L166)
+- [vbot_section01_np.py:40-41](file://motrix_envs/src/motrix_envs/navigation/vbot/vbot_section01_np.py#L40-L41)
 
 ### Observation Space Design
 The observation vector aggregates:
@@ -260,7 +267,7 @@ The observation vector aggregates:
 Dimensions and composition are standardized across environments to support transfer learning and consistent policy design.
 
 **Section sources**
-- [vbot_np.py](file://motrix_envs/src/motrix_envs/navigation/vbot/vbot_np.py#L423-L538)
+- [vbot_np.py:423-538](file://motrix_envs/src/motrix_envs/navigation/vbot/vbot_np.py#L423-L538)
 
 ### Reward Shaping for Navigation
 Rewards balance multiple objectives:
@@ -286,10 +293,10 @@ I --> J["Aggregate Total Reward"]
 ```
 
 **Diagram sources**
-- [vbot_np.py](file://motrix_envs/src/motrix_envs/navigation/vbot/vbot_np.py#L528-L685)
+- [vbot_np.py:528-685](file://motrix_envs/src/motrix_envs/navigation/vbot/vbot_np.py#L528-L685)
 
 **Section sources**
-- [vbot_np.py](file://motrix_envs/src/motrix_envs/navigation/vbot/vbot_np.py#L528-L685)
+- [vbot_np.py:528-685](file://motrix_envs/src/motrix_envs/navigation/vbot/vbot_np.py#L528-L685)
 
 ### Termination Conditions
 Termination is triggered by:
@@ -302,9 +309,58 @@ Termination is triggered by:
 These conditions ensure safe and meaningful episodes for training.
 
 **Section sources**
-- [vbot_np.py](file://motrix_envs/src/motrix_envs/navigation/vbot/vbot_np.py#L505-L526)
-- [vbot_section011_np.py](file://motrix_envs/src/motrix_envs/navigation/vbot/vbot_section011_np.py#L573-L634)
-- [vbot_section002_waypoint_np.py](file://motrix_envs/src/motrix_envs/navigation/vbot/vbot_section002_waypoint_np.py#L1119-L1121)
+- [vbot_np.py:505-526](file://motrix_envs/src/motrix_envs/navigation/vbot/vbot_np.py#L505-L526)
+- [vbot_section011_np.py:573-634](file://motrix_envs/src/motrix_envs/navigation/vbot/vbot_section011_np.py#L573-L634)
+- [vbot_section002_waypoint_np.py:1119-1121](file://motrix_envs/src/motrix_envs/navigation/vbot/vbot_section002_waypoint_np.py#L1119-L1121)
+
+### Enhanced Robot Initialization Positioning
+
+**Updated** The VBotSection002WaypointEnv now features enhanced robot initialization positioning logic with Method 2 testing mode that provides controlled spawn locations for more predictable testing conditions.
+
+#### Method 2 Testing Mode Implementation
+The enhanced initialization system provides controlled coordinate ranges for testing scenarios:
+
+- **X-coordinate range**: -2.5 to 2.5 meters (fixed width of 5.0 meters)
+- **Y-coordinate range**: -0.5 to 0.5 meters (fixed width of 1.0 meter)
+- **Z-coordinate**: Fixed at spawn center height (0.5 meters)
+- **Backward Compatibility**: Original Method 1 training mode implementation is preserved in comments
+
+#### Implementation Details
+The Method 2 approach uses separate random generators for X and Y coordinates:
+
+```mermaid
+flowchart TD
+Start(["Robot Initialization"]) --> CheckMode{"Testing Mode?"}
+CheckMode --> |Yes| Method2["Method 2: Controlled Ranges"]
+CheckMode --> |No| Method1["Method 1: Training Uniform Distribution"]
+Method2 --> GenerateX["Generate X: Uniform(-2.5, 2.5)"]
+Method2 --> GenerateY["Generate Y: Uniform(-0.5, 0.5)"]
+Method1 --> CommentedCode["Commented Method 1 Code<br/>for Reference"]
+GenerateX --> CombineCoords["Combine X+Y Coordinates"]
+GenerateY --> CombineCoords
+CommentedCode --> CombineCoords
+CombineCoords --> SetPosition["Set Robot Position"]
+SetPosition --> Proceed["Proceed with Episode"]
+```
+
+**Diagram sources**
+- [vbot_section002_waypoint_np.py:1725-1760](file://motrix_envs/src/motrix_envs/navigation/vbot/vbot_section002_waypoint_np.py#L1725-L1760)
+
+#### Backward Compatibility Features
+The system maintains full backward compatibility:
+- **Commented Original Implementation**: Method 1 training mode code remains accessible in comments
+- **Conditional Logic**: Testing mode activates based on configuration flags
+- **Fallback Behavior**: If testing mode is disabled, Method 1 behavior is restored
+- **Documentation**: Clear comments explain the purpose and differences between methods
+
+#### Benefits of Enhanced Positioning
+- **Predictable Testing**: Controlled spawn ranges ensure consistent testing conditions
+- **Reduced Variability**: Fixed coordinate ranges minimize episode-to-episode variance
+- **Improved Debugging**: Predictable robot positions facilitate debugging and analysis
+- **Backward Compatibility**: Training mode continues to use uniform distribution for exploration
+
+**Section sources**
+- [vbot_section002_waypoint_np.py:1725-1760](file://motrix_envs/src/motrix_envs/navigation/vbot/vbot_section002_waypoint_np.py#L1725-L1760)
 
 ### Elevated Platform Terrain Environment
 **Updated** The new VBotSection01Env provides specialized navigation capabilities for elevated platform terrain with dedicated configuration and control parameters.
@@ -323,10 +379,10 @@ These conditions ensure safe and meaningful episodes for training.
 - **Default Joint Angles**: Optimized for elevated platform stability
 
 **Section sources**
-- [vbot_section01_np.py](file://motrix_envs/src/motrix_envs/navigation/vbot/vbot_section01_np.py#L40-L41)
-- [vbot_section01_np.py](file://motrix_envs/src/motrix_envs/navigation/vbot/vbot_section01_np.py#L48-L92)
-- [vbot_section01_np.py](file://motrix_envs/src/motrix_envs/navigation/vbot/vbot_section01_np.py#L247-L259)
-- [vbot_section01_np.py](file://motrix_envs/src/motrix_envs/navigation/vbot/vbot_section01_np.py#L343-L458)
+- [vbot_section01_np.py:40-41](file://motrix_envs/src/motrix_envs/navigation/vbot/vbot_section01_np.py#L40-L41)
+- [vbot_section01_np.py:48-92](file://motrix_envs/src/motrix_envs/navigation/vbot/vbot_section01_np.py#L48-L92)
+- [vbot_section01_np.py:247-259](file://motrix_envs/src/motrix_envs/navigation/vbot/vbot_section01_np.py#L247-L259)
+- [vbot_section01_np.py:343-458](file://motrix_envs/src/motrix_envs/navigation/vbot/vbot_section01_np.py#L343-L458)
 
 ## Enhanced Turning Logic System
 
@@ -362,7 +418,7 @@ Deadband --> Output["Output Final Commands"]
 ```
 
 **Diagram sources**
-- [vbot_section002_waypoint_np.py](file://motrix_envs/src/motrix_envs/navigation/vbot/vbot_section002_waypoint_np.py#L857-L877)
+- [vbot_section002_waypoint_np.py:857-877](file://motrix_envs/src/motrix_envs/navigation/vbot/vbot_section002_waypoint_np.py#L857-L877)
 
 ### Adaptive Turn Prioritization
 The system intelligently prioritizes turns over forward movement when large directional changes are required:
@@ -378,7 +434,7 @@ The system intelligently prioritizes turns over forward movement when large dire
 - **Deadband Application**: Prevents oscillation with 8-degree deadband
 
 **Section sources**
-- [vbot_section002_waypoint_np.py](file://motrix_envs/src/motrix_envs/navigation/vbot/vbot_section002_waypoint_np.py#L862-L877)
+- [vbot_section002_waypoint_np.py:862-877](file://motrix_envs/src/motrix_envs/navigation/vbot/vbot_section002_waypoint_np.py#L862-L877)
 
 ## Waypoint-Based Navigation System
 
@@ -421,7 +477,7 @@ Celebration --> Continue
 ```
 
 **Diagram sources**
-- [vbot_section002_waypoint_np.py](file://motrix_envs/src/motrix_envs/navigation/vbot/vbot_section002_waypoint_np.py#L198-L253)
+- [vbot_section002_waypoint_np.py:198-253](file://motrix_envs/src/motrix_envs/navigation/vbot/vbot_section002_waypoint_np.py#L198-L253)
 
 ### Dynamic Path Planning
 The system maintains a persistent waypoint path that guides robot navigation:
@@ -435,8 +491,8 @@ The system maintains a persistent waypoint path that guides robot navigation:
 When a waypoint is reached, the system automatically updates the navigation goal to the next unvisited waypoint in index order. This creates a continuous path that spans multiple track sections.
 
 **Section sources**
-- [vbot_section002_waypoint_np.py](file://motrix_envs/src/motrix_envs/navigation/vbot/vbot_section002_waypoint_np.py#L142-L166)
-- [vbot_section002_waypoint_np.py](file://motrix_envs/src/motrix_envs/navigation/vbot/vbot_section002_waypoint_np.py#L384-L421)
+- [vbot_section002_waypoint_np.py:142-166](file://motrix_envs/src/motrix_envs/navigation/vbot/vbot_section002_waypoint_np.py#L142-L166)
+- [vbot_section002_waypoint_np.py:384-421](file://motrix_envs/src/motrix_envs/navigation/vbot/vbot_section002_waypoint_np.py#L384-L421)
 
 ## Stuck Termination Detection System
 
@@ -477,8 +533,8 @@ SetDetected --> StepLoop
 ```
 
 **Diagram sources**
-- [vbot_section002_waypoint_np.py](file://motrix_envs/src/motrix_envs/navigation/vbot/vbot_section002_waypoint_np.py#L103-L120)
-- [vbot_section002_waypoint_np.py](file://motrix_envs/src/motrix_envs/navigation/vbot/vbot_section002_waypoint_np.py#L121-L171)
+- [vbot_section002_waypoint_np.py:103-120](file://motrix_envs/src/motrix_envs/navigation/vbot/vbot_section002_waypoint_np.py#L103-L120)
+- [vbot_section002_waypoint_np.py:121-171](file://motrix_envs/src/motrix_envs/navigation/vbot/vbot_section002_waypoint_np.py#L121-L171)
 
 ### Detection Logic Implementation
 The stuck detection algorithm operates on a per-environment basis with the following key components:
@@ -521,9 +577,9 @@ The stuck detection state is reset when:
 - Episode resets occur
 
 **Section sources**
-- [vbot_section002_waypoint_np.py](file://motrix_envs/src/motrix_envs/navigation/vbot/vbot_section002_waypoint_np.py#L103-L120)
-- [vbot_section002_waypoint_np.py](file://motrix_envs/src/motrix_envs/navigation/vbot/vbot_section002_waypoint_np.py#L121-L171)
-- [vbot_section002_waypoint_np.py](file://motrix_envs/src/motrix_envs/navigation/vbot/vbot_section002_waypoint_np.py#L1119-L1121)
+- [vbot_section002_waypoint_np.py:103-120](file://motrix_envs/src/motrix_envs/navigation/vbot/vbot_section002_waypoint_np.py#L103-L120)
+- [vbot_section002_waypoint_np.py:121-171](file://motrix_envs/src/motrix_envs/navigation/vbot/vbot_section002_waypoint_np.py#L121-L171)
+- [vbot_section002_waypoint_np.py:1119-1121](file://motrix_envs/src/motrix_envs/navigation/vbot/vbot_section002_waypoint_np.py#L1119-L1121)
 
 ## Difficulty Modes and Configuration
 
@@ -577,9 +633,9 @@ Each mode defines a unique set of waypoints with varying complexity:
 The system uses Python's `__post_init__` method to automatically select the appropriate waypoint configuration based on the `difficulty_mode` setting, ensuring seamless mode switching. The default difficulty mode is now 'hard-4'.
 
 **Section sources**
-- [cfg_opendoge.py](file://motrix_envs/src/motrix_envs/navigation/vbot/cfg_opendoge.py#L790-L905)
-- [cfg_opendoge.py](file://motrix_envs/src/motrix_envs/navigation/vbot/cfg_opendoge.py#L907-L911)
-- [scene_section002_waypoint.xml](file://motrix_envs/src/motrix_envs/navigation/vbot/xmls/scene_section002_waypoint.xml#L51-L80)
+- [cfg_opendoge.py:790-905](file://motrix_envs/src/motrix_envs/navigation/vbot/cfg_opendoge.py#L790-L905)
+- [cfg_opendoge.py:907-911](file://motrix_envs/src/motrix_envs/navigation/vbot/cfg_opendoge.py#L907-L911)
+- [scene_section002_waypoint.xml:51-80](file://motrix_envs/src/motrix_envs/navigation/vbot/xmls/scene_section002_waypoint.xml#L51-L80)
 
 ## Celebration System
 
@@ -633,11 +689,11 @@ Celebration->>Robot : "Restore Normal Actions"
 ```
 
 **Diagram sources**
-- [vbot_section002_waypoint_np.py](file://motrix_envs/src/motrix_envs/navigation/vbot/vbot_section002_waypoint_np.py#L300-L370)
+- [vbot_section002_waypoint_np.py:300-370](file://motrix_envs/src/motrix_envs/navigation/vbot/vbot_section002_waypoint_np.py#L300-L370)
 
 **Section sources**
-- [vbot_section002_waypoint_np.py](file://motrix_envs/src/motrix_envs/navigation/vbot/vbot_section002_waypoint_np.py#L287-L298)
-- [vbot_section002_waypoint_np.py](file://motrix_envs/src/motrix_envs/navigation/vbot/vbot_section002_waypoint_np.py#L300-L370)
+- [vbot_section002_waypoint_np.py:287-298](file://motrix_envs/src/motrix_envs/navigation/vbot/vbot_section002_waypoint_np.py#L287-L298)
+- [vbot_section002_waypoint_np.py:300-370](file://motrix_envs/src/motrix_envs/navigation/vbot/vbot_section002_waypoint_np.py#L300-L370)
 
 ## Advanced Reward Components
 
@@ -680,11 +736,11 @@ CheckConditions --> |Yes| InPlaceReward["1.5 Reward for In-place Turn"]
 ```
 
 **Diagram sources**
-- [vbot_section002_waypoint_np.py](file://motrix_envs/src/motrix_envs/navigation/vbot/vbot_section002_waypoint_np.py#L1347-L1369)
+- [vbot_section002_waypoint_np.py:1347-1369](file://motrix_envs/src/motrix_envs/navigation/vbot/vbot_section002_waypoint_np.py#L1347-L1369)
 
 **Section sources**
-- [vbot_section002_waypoint_np.py](file://motrix_envs/src/motrix_envs/navigation/vbot/vbot_section002_waypoint_np.py#L1277-L1298)
-- [vbot_section002_waypoint_np.py](file://motrix_envs/src/motrix_envs/navigation/vbot/vbot_section002_waypoint_np.py#L1347-L1369)
+- [vbot_section002_waypoint_np.py:1277-1298](file://motrix_envs/src/motrix_envs/navigation/vbot/vbot_section002_waypoint_np.py#L1277-L1298)
+- [vbot_section002_waypoint_np.py:1347-1369](file://motrix_envs/src/motrix_envs/navigation/vbot/vbot_section002_waypoint_np.py#L1347-L1369)
 
 ## Python Package Infrastructure
 
@@ -748,14 +804,14 @@ Profiling --> End(["Application End"])
 ```
 
 **Diagram sources**
-- [app.py](file://pip-uninstall-uy98kyog/app.py#L331-L390)
-- [flags/__init__.py](file://pip-uninstall-uy98kyog/flags/__init__.py#L123-L141)
-- [flags/_argument_parser.py](file://pip-uninstall-uy98kyog/flags/_argument_parser.py#L77-L91)
+- [app.py:331-390](file://pip-uninstall-uy98kyog/app.py#L331-L390)
+- [flags/__init__.py:123-141](file://pip-uninstall-uy98kyog/flags/__init__.py#L123-L141)
+- [flags/_argument_parser.py:77-91](file://pip-uninstall-uy98kyog/flags/_argument_parser.py#L77-L91)
 
 **Section sources**
-- [flags/__init__.py](file://pip-uninstall-uy98kyog/flags/__init__.py#L14-L221)
-- [app.py](file://pip-uninstall-uy98kyog/app.py#L15-L540)
-- [flags/_argument_parser.py](file://pip-uninstall-uy98kyog/flags/_argument_parser.py#L1-L200)
+- [flags/__init__.py:14-221](file://pip-uninstall-uy98kyog/flags/__init__.py#L14-L221)
+- [app.py:15-540](file://pip-uninstall-uy98kyog/app.py#L15-L540)
+- [flags/_argument_parser.py:1-200](file://pip-uninstall-uy98kyog/flags/_argument_parser.py#L1-L200)
 - [testing/flagsaver.py](file://pip-uninstall-uy98kyog/testing/flagsaver.py)
 
 ## Dependency Analysis
@@ -768,6 +824,7 @@ The VBot navigation module depends on:
 - **Testing utilities**: Integrated testing framework for development and validation
 - **Application framework**: Complete application management with debugging and profiling support
 - **Stuck detection system**: Advanced circular buffer implementation for motion monitoring
+- **Enhanced robot initialization positioning**: Method 2 testing mode with controlled coordinate ranges
 
 ```mermaid
 graph TB
@@ -784,6 +841,7 @@ FLAG["Flag Parsing<br/>Abseil Flags Infrastructure"]
 TEST["Testing Utilities<br/>Flagsaver + Parameterized Tests"]
 APP["Application Framework<br/>Debugging + Profiling Support"]
 STUCK["Stuck Detection System<br/>Circular Buffer + Motion Monitoring"]
+INIT["Enhanced Robot Initialization<br/>Method 2 Testing Mode"]
 END
 REG --> ENV
 CFG --> ENV
@@ -797,25 +855,27 @@ ENV --> FLAG
 ENV --> TEST
 ENV --> APP
 ENV --> STUCK
+ENV --> INIT
 FLAG --> ENV
 TEST --> ENV
 APP --> ENV
 STUCK --> ENV
+INIT --> ENV
 ```
 
 **Diagram sources**
-- [__init__.py](file://motrix_envs/src/motrix_envs/navigation/vbot/__init__.py#L17-L35)
-- [cfg.py](file://motrix_envs/src/motrix_envs/navigation/vbot/cfg.py#L19-L20)
-- [vbot_np.py](file://motrix_envs/src/motrix_envs/navigation/vbot/vbot_np.py#L21-L23)
-- [vbot_section002_waypoint_np.py](file://motrix_envs/src/motrix_envs/navigation/vbot/vbot_section002_waypoint_np.py#L27-L33)
-- [vbot_section01_np.py](file://motrix_envs/src/motrix_envs/navigation/vbot/vbot_section01_np.py#L20-L25)
-- [flags/__init__.py](file://pip-uninstall-uy98kyog/flags/__init__.py#L14-L221)
-- [app.py](file://pip-uninstall-uy98kyog/app.py#L15-L540)
+- [__init__.py:17-35](file://motrix_envs/src/motrix_envs/navigation/vbot/__init__.py#L17-L35)
+- [cfg.py:19-20](file://motrix_envs/src/motrix_envs/navigation/vbot/cfg.py#L19-L20)
+- [vbot_np.py:21-23](file://motrix_envs/src/motrix_envs/navigation/vbot/vbot_np.py#L21-L23)
+- [vbot_section002_waypoint_np.py:27-33](file://motrix_envs/src/motrix_envs/navigation/vbot/vbot_section002_waypoint_np.py#L27-L33)
+- [vbot_section01_np.py:20-25](file://motrix_envs/src/motrix_envs/navigation/vbot/vbot_section01_np.py#L20-L25)
+- [flags/__init__.py:14-221](file://pip-uninstall-uy98kyog/flags/__init__.py#L14-L221)
+- [app.py:15-540](file://pip-uninstall-uy98kyog/app.py#L15-L540)
 
 **Section sources**
-- [__init__.py](file://motrix_envs/src/motrix_envs/navigation/vbot/__init__.py#L17-L35)
-- [cfg.py](file://motrix_envs/src/motrix_envs/navigation/vbot/cfg.py#L19-L20)
-- [vbot_np.py](file://motrix_envs/src/motrix_envs/navigation/vbot/vbot_np.py#L21-L23)
+- [__init__.py:17-35](file://motrix_envs/src/motrix_envs/navigation/vbot/__init__.py#L17-L35)
+- [cfg.py:19-20](file://motrix_envs/src/motrix_envs/navigation/vbot/cfg.py#L19-L20)
+- [vbot_np.py:21-23](file://motrix_envs/src/motrix_envs/navigation/vbot/vbot_np.py#L21-L23)
 
 ## Performance Considerations
 - Action filtering: Exponential smoothing of actions reduces jitter and improves control stability.
@@ -838,6 +898,7 @@ STUCK --> ENV
 - **Application framework**: Integrated debugging and profiling support streamline development workflow.
 - **Stuck detection efficiency**: Circular buffer implementation minimizes memory overhead while providing comprehensive motion monitoring.
 - **Terrain model loading order**: Optimized XML loading sequence improves scene initialization performance.
+- **Enhanced robot initialization positioning**: Method 2 testing mode provides controlled spawn locations with backward compatibility to original training mode.
 
 ## Training Methodology
 - Flat Base Training: Start with the flat terrain environment to learn basic navigation skills (position/heading tracking, obstacle avoidance).
@@ -848,6 +909,7 @@ STUCK --> ENV
 - **Advanced Turning Training**: Utilize the enhanced turning logic system to learn intelligent turn prioritization and large turn handling.
 - **Elevated Platform Training**: Utilate the new VBotSection01Env for specialized elevated platform navigation skills.
 - **Stuck Detection Training**: Utilize the stuck detection system to teach robots how to recover from immobilized states.
+- **Enhanced Robot Initialization Training**: Utilize Method 2 testing mode for controlled spawn locations during testing phases.
 - **Difficulty Scaling**: Progress from simple to hard difficulty modes to gradually increase path complexity.
 - Multi-Section Training: Combine sections into longer courses to practice continuous navigation across transitions.
 - **Flag-based Configuration**: Utilize flag parsing for dynamic environment configuration and parameter tuning.
@@ -860,6 +922,7 @@ STUCK --> ENV
 - **Advanced Turning Curriculum**: Begin with small turns, progress to large turns (>60°), and finally master complex navigation scenarios.
 - **Elevated Platform Curriculum**: Start with basic elevated platform navigation, progress to complex height management, and finally master precision platform traversal.
 - **Stuck Detection Curriculum**: Begin with environments that rarely encounter stuck situations, progress to more challenging terrains with higher stuck probability.
+- **Enhanced Robot Initialization Curriculum**: Start with Method 1 training mode for exploration, progress to Method 2 testing mode for controlled evaluation.
 - **Difficulty Progression**: Systematic progression through difficulty modes (simple → easy → normal → hard-1 → hard-2 → hard-3 → hard-4 → hard-5) for optimal learning.
 - Transfer Learning: Use pre-trained policies from simpler sections as initialization for harder sections. Shared observation/action spaces facilitate cross-task adaptation.
 - Section Interleaving: Alternate between sections during training to improve generalization across diverse track layouts.
@@ -881,6 +944,7 @@ Common issues and remedies:
 - **Turn priority conflicts**: Verify turn priority factors (0.3 forward speed, 1.5 turn amplification) are appropriate for robot dynamics.
 - **Waypoint proximity reward problems**: Adjust proximity thresholds (1.0m) and in-place turn conditions for optimal performance.
 - **Waypoint reach distance issues**: Verify the 0.1 meter threshold is appropriate for the specific waypoint configuration being used.
+- **Enhanced robot initialization positioning issues**: Verify Method 2 testing mode is properly configured and backward compatibility is maintained.
 - **Debugging and logging**: Utilize comprehensive logging system for waypoint system operations, sensor failures, and reward calculations.
 - **Flag parsing issues**: Verify flag definitions and validation rules are correctly configured for the intended use case.
 - **Testing utility conflicts**: Ensure proper isolation and cleanup when using flagsaver and other testing utilities.
@@ -890,13 +954,13 @@ Common issues and remedies:
 - **Terrain model loading issues**: Verify XML loading order and model file accessibility for proper scene initialization.
 
 **Section sources**
-- [vbot_section011_np.py](file://motrix_envs/src/motrix_envs/navigation/vbot/vbot_section011_np.py#L573-L634)
-- [vbot_section012_np.py](file://motrix_envs/src/motrix_envs/navigation/vbot/vbot_section012_np.py#L573-L634)
-- [vbot_section013_np.py](file://motrix_envs/src/motrix_envs/navigation/vbot/vbot_section013_np.py#L573-L634)
-- [vbot_section002_waypoint_np.py](file://motrix_envs/src/motrix_envs/navigation/vbot/vbot_section002_waypoint_np.py#L198-L253)
-- [vbot_section01_np.py](file://motrix_envs/src/motrix_envs/navigation/vbot/vbot_section01_np.py#L495-L680)
+- [vbot_section011_np.py:573-634](file://motrix_envs/src/motrix_envs/navigation/vbot/vbot_section011_np.py#L573-L634)
+- [vbot_section012_np.py:573-634](file://motrix_envs/src/motrix_envs/navigation/vbot/vbot_section012_np.py#L573-L634)
+- [vbot_section013_np.py:573-634](file://motrix_envs/src/motrix_envs/navigation/vbot/vbot_section013_np.py#L573-L634)
+- [vbot_section002_waypoint_np.py:198-253](file://motrix_envs/src/motrix_envs/navigation/vbot/vbot_section002_waypoint_np.py#L198-L253)
+- [vbot_section01_np.py:495-680](file://motrix_envs/src/motrix_envs/navigation/vbot/vbot_section01_np.py#L495-L680)
 
 ## Conclusion
 The VBot navigation environments provide a flexible, modular framework for training wheeled robots across diverse track sections. With carefully designed observation spaces, reward shaping, and section-specific adaptations, the system supports effective curriculum learning and transfer learning strategies.
 
-**Updated** The enhanced VBot navigation system now features a sophisticated turning logic system with arctan2-based heading calculations, large turn detection (60-degree threshold), and adaptive turn prioritization. The introduction of the new VBotSection01Env for elevated platform terrain navigation provides specialized capabilities for height management and precision platform traversal. The comprehensive waypoint system with six difficulty modes (simple to hard-5) and enhanced celebration system with smooth pose animations provides maximum training complexity and reward opportunities. The integrated Python package infrastructure with flag parsing, testing utilities, and application framework streamlines development, testing, and deployment processes. The renamed 'celebration' system replaces the previous 'special action' terminology with more descriptive naming and improved animation mechanics. The corrected waypoint reach distance parameterization to 0.1 meters ensures optimal balance between reliability and responsiveness. The centralized configuration system and environment registry simplify experimentation and deployment across multiple track layouts. Most significantly, the new stuck termination detection system provides robust automatic termination for immobilized robots, improving training reliability and preventing infinite episodes. The enhanced terrain model loading order in the scene XML optimizes initialization performance. The stuck detection system with its 480-step circular buffer, 0.15m positional threshold, and 15-degree rotational threshold provides comprehensive motion monitoring with automatic termination after 240 consecutive detections. This addition completes the navigation system with advanced failure detection capabilities, making it an ideal platform for advanced robotics research and education with enhanced navigation capabilities, intelligent behavior patterns, and robust termination detection.
+**Updated** The enhanced VBot navigation system now features a sophisticated turning logic system with arctan2-based heading calculations, large turn detection (60-degree threshold), and adaptive turn prioritization. The introduction of the new VBotSection01Env for elevated platform terrain navigation provides specialized capabilities for height management and precision platform traversal. The comprehensive waypoint system with six difficulty modes (simple to hard-5) and enhanced celebration system with smooth pose animations provides maximum training complexity and reward opportunities. The integrated Python package infrastructure with flag parsing, testing utilities, and application framework streamlines development, testing, and deployment processes. The renamed 'celebration' system replaces the previous 'special action' terminology with more descriptive naming and improved animation mechanics. The corrected waypoint reach distance parameterization to 0.1 meters ensures optimal balance between reliability and responsiveness. The centralized configuration system and environment registry simplify experimentation and deployment across multiple track layouts. Most significantly, the new stuck termination detection system provides robust automatic termination for immobilized robots, improving training reliability and preventing infinite episodes. The enhanced terrain model loading order in the scene XML optimizes initialization performance. The stuck detection system with its 480-step circular buffer, 0.15m positional threshold, and 15-degree rotational threshold provides comprehensive motion monitoring with automatic termination after 240 consecutive detections. The enhanced robot initialization positioning logic with Method 2 testing mode provides controlled spawn locations for predictable testing conditions while maintaining backward compatibility with the original training mode implementation. This addition completes the navigation system with advanced failure detection capabilities, making it an ideal platform for advanced robotics research and education with enhanced navigation capabilities, intelligent behavior patterns, and robust termination detection.
